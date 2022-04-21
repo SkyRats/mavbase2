@@ -1,0 +1,2 @@
+source;share/mavbase2/environment/ament_prefix_path.sh
+source;share/mavbase2/environment/path.sh

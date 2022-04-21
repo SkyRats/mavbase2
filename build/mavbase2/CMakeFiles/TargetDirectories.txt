@@ -1,0 +1,9 @@
+/home/soph/skyrats_ws/src/mavbase2/build/mavbase2/CMakeFiles/install/strip.dir
+/home/soph/skyrats_ws/src/mavbase2/build/mavbase2/CMakeFiles/install/local.dir
+/home/soph/skyrats_ws/src/mavbase2/build/mavbase2/CMakeFiles/install.dir
+/home/soph/skyrats_ws/src/mavbase2/build/mavbase2/CMakeFiles/list_install_components.dir
+/home/soph/skyrats_ws/src/mavbase2/build/mavbase2/CMakeFiles/rebuild_cache.dir
+/home/soph/skyrats_ws/src/mavbase2/build/mavbase2/CMakeFiles/edit_cache.dir
+/home/soph/skyrats_ws/src/mavbase2/build/mavbase2/CMakeFiles/test.dir
+/home/soph/skyrats_ws/src/mavbase2/build/mavbase2/CMakeFiles/mavbase2_uninstall.dir
+/home/soph/skyrats_ws/src/mavbase2/build/mavbase2/CMakeFiles/uninstall.dir

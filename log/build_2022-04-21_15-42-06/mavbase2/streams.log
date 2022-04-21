@@ -1,0 +1,53 @@
+[0.089s] Invoking command in '/home/soph/skyrats_ws/src/mavbase2/build/mavbase2': CMAKE_PREFIX_PATH=/opt/ros/galactic /usr/bin/cmake /home/soph/skyrats_ws/src/mavbase2 -DCMAKE_INSTALL_PREFIX=/home/soph/skyrats_ws/src/mavbase2/install/mavbase2
+[1.492s] -- The C compiler identification is GNU 9.4.0
+[2.229s] -- The CXX compiler identification is GNU 9.4.0
+[2.295s] -- Check for working C compiler: /usr/bin/cc
+[2.485s] -- Check for working C compiler: /usr/bin/cc -- works
+[2.487s] -- Detecting C compiler ABI info
+[2.673s] -- Detecting C compiler ABI info - done
+[2.698s] -- Detecting C compile features
+[2.699s] -- Detecting C compile features - done
+[2.706s] -- Check for working CXX compiler: /usr/bin/c++
+[2.868s] -- Check for working CXX compiler: /usr/bin/c++ -- works
+[2.869s] -- Detecting CXX compiler ABI info
+[3.043s] -- Detecting CXX compiler ABI info - done
+[3.070s] -- Detecting CXX compile features
+[3.071s] -- Detecting CXX compile features - done
+[3.186s] -- Found ament_cmake: 1.1.5 (/opt/ros/galactic/share/ament_cmake/cmake)
+[3.339s] -- Found PythonInterp: /usr/bin/python3 (found suitable version "3.8.10", minimum required is "3") 
+[3.339s] -- Using PYTHON_EXECUTABLE: /usr/bin/python3
+[3.786s] -- Found ament_lint_auto: 0.10.6 (/opt/ros/galactic/share/ament_lint_auto/cmake)
+[3.996s] -- Added test 'copyright' to check source files copyright and LICENSE
+[4.010s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[4.010s] -- Configured cppcheck include dirs: 
+[4.010s] -- Configured cppcheck exclude dirs and/or files: 
+[4.034s] -- Added test 'cpplint' to check C / C++ code against the Google style
+[4.034s] -- Configured cpplint exclude dirs and/or files: 
+[4.039s] -- Added test 'lint_cmake' to check CMake code style
+[4.055s] -- Added test 'uncrustify' to check C / C++ code style
+[4.055s] -- Configured uncrustify additional arguments: 
+[4.058s] -- Added test 'xmllint' to check XML markup files
+[4.063s] -- Configuring done
+[4.066s] -- Generating done
+[4.070s] -- Build files have been written to: /home/soph/skyrats_ws/src/mavbase2/build/mavbase2
+[4.080s] Invoked command in '/home/soph/skyrats_ws/src/mavbase2/build/mavbase2' returned '0': CMAKE_PREFIX_PATH=/opt/ros/galactic /usr/bin/cmake /home/soph/skyrats_ws/src/mavbase2 -DCMAKE_INSTALL_PREFIX=/home/soph/skyrats_ws/src/mavbase2/install/mavbase2
+[4.087s] Invoking command in '/home/soph/skyrats_ws/src/mavbase2/build/mavbase2': CMAKE_PREFIX_PATH=/opt/ros/galactic /usr/bin/cmake --build /home/soph/skyrats_ws/src/mavbase2/build/mavbase2 -- -j2 -l2
+[4.167s] Invoked command in '/home/soph/skyrats_ws/src/mavbase2/build/mavbase2' returned '0': CMAKE_PREFIX_PATH=/opt/ros/galactic /usr/bin/cmake --build /home/soph/skyrats_ws/src/mavbase2/build/mavbase2 -- -j2 -l2
+[4.234s] Invoking command in '/home/soph/skyrats_ws/src/mavbase2/build/mavbase2': CMAKE_PREFIX_PATH=/opt/ros/galactic /usr/bin/cmake --install /home/soph/skyrats_ws/src/mavbase2/build/mavbase2
+[4.258s] -- Install configuration: ""
+[4.258s] -- Installing: /home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/ament_index/resource_index/package_run_dependencies/mavbase2
+[4.259s] -- Installing: /home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/ament_index/resource_index/parent_prefix_path/mavbase2
+[4.261s] -- Installing: /home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/environment/ament_prefix_path.sh
+[4.262s] -- Installing: /home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/environment/ament_prefix_path.dsv
+[4.262s] -- Installing: /home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/environment/path.sh
+[4.262s] -- Installing: /home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/environment/path.dsv
+[4.262s] -- Installing: /home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/local_setup.bash
+[4.263s] -- Installing: /home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/local_setup.sh
+[4.263s] -- Installing: /home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/local_setup.zsh
+[4.264s] -- Installing: /home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/local_setup.dsv
+[4.264s] -- Installing: /home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/package.dsv
+[4.265s] -- Installing: /home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/ament_index/resource_index/packages/mavbase2
+[4.265s] -- Installing: /home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/cmake/mavbase2Config.cmake
+[4.265s] -- Installing: /home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/cmake/mavbase2Config-version.cmake
+[4.266s] -- Installing: /home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/package.xml
+[4.271s] Invoked command in '/home/soph/skyrats_ws/src/mavbase2/build/mavbase2' returned '0': CMAKE_PREFIX_PATH=/opt/ros/galactic /usr/bin/cmake --install /home/soph/skyrats_ws/src/mavbase2/build/mavbase2

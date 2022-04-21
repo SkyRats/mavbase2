@@ -1,0 +1,15 @@
+/home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/ament_index/resource_index/package_run_dependencies/mavbase2
+/home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/ament_index/resource_index/parent_prefix_path/mavbase2
+/home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/environment/ament_prefix_path.sh
+/home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/environment/ament_prefix_path.dsv
+/home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/environment/path.sh
+/home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/environment/path.dsv
+/home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/local_setup.bash
+/home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/local_setup.sh
+/home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/local_setup.zsh
+/home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/local_setup.dsv
+/home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/package.dsv
+/home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/ament_index/resource_index/packages/mavbase2
+/home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/cmake/mavbase2Config.cmake
+/home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/cmake/mavbase2Config-version.cmake
+/home/soph/skyrats_ws/src/mavbase2/install/mavbase2/share/mavbase2/package.xml

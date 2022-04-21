@@ -1,0 +1,6 @@
+Invoking command in '/home/soph/skyrats_ws/src/mavbase2/build/mavbase2': CMAKE_PREFIX_PATH=/opt/ros/galactic /usr/bin/cmake /home/soph/skyrats_ws/src/mavbase2 -DCMAKE_INSTALL_PREFIX=/home/soph/skyrats_ws/src/mavbase2/install/mavbase2
+Invoked command in '/home/soph/skyrats_ws/src/mavbase2/build/mavbase2' returned '0': CMAKE_PREFIX_PATH=/opt/ros/galactic /usr/bin/cmake /home/soph/skyrats_ws/src/mavbase2 -DCMAKE_INSTALL_PREFIX=/home/soph/skyrats_ws/src/mavbase2/install/mavbase2
+Invoking command in '/home/soph/skyrats_ws/src/mavbase2/build/mavbase2': CMAKE_PREFIX_PATH=/opt/ros/galactic /usr/bin/cmake --build /home/soph/skyrats_ws/src/mavbase2/build/mavbase2 -- -j2 -l2
+Invoked command in '/home/soph/skyrats_ws/src/mavbase2/build/mavbase2' returned '0': CMAKE_PREFIX_PATH=/opt/ros/galactic /usr/bin/cmake --build /home/soph/skyrats_ws/src/mavbase2/build/mavbase2 -- -j2 -l2
+Invoking command in '/home/soph/skyrats_ws/src/mavbase2/build/mavbase2': CMAKE_PREFIX_PATH=/opt/ros/galactic /usr/bin/cmake --install /home/soph/skyrats_ws/src/mavbase2/build/mavbase2
+Invoked command in '/home/soph/skyrats_ws/src/mavbase2/build/mavbase2' returned '0': CMAKE_PREFIX_PATH=/opt/ros/galactic /usr/bin/cmake --install /home/soph/skyrats_ws/src/mavbase2/build/mavbase2

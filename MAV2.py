@@ -84,6 +84,7 @@ class MAV2(Node):
         # IMPLEMENTAR
         print()
         
+        
     ########## Disarm #######
     def _disarm(self):
         self.get_logger().warn('DISARM MAV')

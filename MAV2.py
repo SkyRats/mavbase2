@@ -2,12 +2,17 @@ import rclpy
 import mavros_msgs
 from mavros_msgs import srv
 from mavros_msgs.srv import SetMode, CommandBool
+from mavros_msgs.msg import State, ExtendedState, PositionTarget
 from geometry_msgs.msg import PoseStamped, TwistStamped
-from std_msgs.msg import String
+from geographic_msgs.msg import GeoPoseStamped
+from sensor_msgs.msg import BatteryState, NavSatFix
+#from std_msgs.msg import String
 from rclpy.node import Node
 import numpy as np
 import math
 import time
+
+
 
 TOL = 0.3
 DEBUG = False
@@ -27,10 +32,22 @@ class MAV2(Node):
 
     def __init__(self):
         super().__init__('mav')
+
+        ############ Attributes #################
+
         self.rate = self.create_rate(60)
         self.desired_state = ""
+        self.drone_state = State()
+        self.goal_pose = PoseStamped()
+        self.pose_target = PositionTarget()
+        self.goal_vel = TwistStamped()
+        self.drone_state = State()
+        self.battery = BatteryState()
+        self.global_pose = NavSatFix()
+        self.gps_target = GeoPoseStamped()
         
         ############# Services ##################
+        
         self.set_mode_srv = self.create_client('/mavros/set_mode', SetMode)
         
         self.arm = self.create_client('/mavros/cmd/arming', CommandBool)
@@ -39,13 +56,29 @@ class MAV2(Node):
         ############## Actions ##################
 
         ############### Publishers ##############
-
+        
+        self.local_position_pub = self.create_publisher(PoseStamped, '/mavros/setpoint_position/local', queue_size = 20)
+        self.velocity_pub = self.create_publisher(TwistStamped,  '/mavros/setpoint_velocity/cmd_vel', queue_size=5)
+        self.target_pub = self.create_publisher(PositionTarget, '/mavros/setpoint_raw/local', queue_size=5)
+        self.global_position_pub = self.create_publisher(GeoPoseStamped, '/mavros/setpoint_position/global', queue_size= 20)
+        
         ########## Subscribers ##################
+
+        self.local_atual = self.create_subscriber(PoseStamped, '/mavros/setpoint_position/local', self.local_callback)
+        self.state_sub =  self.create_subscriber(State, '/mavros/state', self.state_callback, queue_size=10) 
+        self.battery_sub =  self.create_subscriber(BatteryState, '/mavros/battery', self.battery_callback)
+        self.global_position_sub =  self.create_subscriber(NavSatFix,'/mavros/global_position/global' , self.global_callback)
+        self.extended_state_sub = self.create_subscriber(ExtendedState,'/mavros/extended_state', self.extended_state_callback, queue_size=2)
+
+        ########## Callback functions ###########
 
 
         service_timeout = 15
-        while not self.cli.wait_for_service(service_timeout):
-            self.get_logger().info('service not available, waiting again...')
+        while not self.set_mode_srv.wait_for_service(timeout_sec=service_timeout):
+            self.get_logger().info('Set mode service not available, waiting again...')
+        while not self.arm.wait_for_service(timeout_sec=service_timeout):
+            self.get_logger().info('Arm service not available, waiting again...')
+            
         self.arm_req = 'mavros/cmd/arming'.Request()
         self.set_mode_req = 'mavros/set_mode'.Request()
         self.get_logger().info("Services are up")
@@ -66,19 +99,15 @@ class MAV2(Node):
                 break
             else:
                 try:
-                    result = self.set_mode_srv(0, mode)  # 0 is custom mode
+                    result = self.set_mode_srv.call_async(self.set_mode_req)  # 0 is custom mode
                     if not result.mode_sent:
                         self.get_logger().info("failed to send mode command")
-                except SystemError as e:
-                    print('exception in server:', file=sys.stderr)
+                except Exception as e:
                     self.get_logger().info(e)
-                except rospy.ServiceException as e:
-                    self.get_logger().info(e)
-
             try:
                 loop_rate.sleep()
-            except rospy.ROSException as e:
-                self.get.logger().info(e)
+            except Exception as e:
+                self.get_logger().info(e)
         
     def land(self):
         # IMPLEMENTAR
@@ -104,6 +133,6 @@ class MAV2(Node):
 
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
-    mav = MAV("jorge")
+    mav = MAV2("jorge")
     mav.takeoff(3)
     mav.RTL()

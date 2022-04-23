@@ -1,3 +1,6 @@
+from asyncio.windows_events import NULL
+from tkinter import SEL
+from turtle import position
 import rclpy
 import mavros_msgs
 from mavros_msgs import srv
@@ -5,13 +8,17 @@ from mavros_msgs.srv import SetMode, CommandBool
 from mavros_msgs.msg import State, ExtendedState, PositionTarget
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from geographic_msgs.msg import GeoPoseStamped
+import rospy
 from sensor_msgs.msg import BatteryState, NavSatFix
 #from std_msgs.msg import String
 from rclpy.node import Node
+from rclpy.action import ActionServer  
+from rclpy.action import ActionClient   
 import numpy as np
 import math
 import time
 
+from action import Takeoff
 
 
 TOL = 0.3
@@ -39,6 +46,7 @@ class MAV2(Node):
         self.desired_state = ""
         self.drone_state = State()
         self.goal_pose = PoseStamped()
+        self.drone_pose = PoseStamped()
         self.pose_target = PositionTarget()
         self.goal_vel = TwistStamped()
         self.drone_state = State()
@@ -53,7 +61,15 @@ class MAV2(Node):
         self.arm = self.create_client('/mavros/cmd/arming', CommandBool)
          
         
-        ############## Actions ##################
+        ############## Action Servers ##################
+        self._action_server = ActionServer(
+            self,
+            Takeoff,
+            'takeoff',
+            self.takeoff_server_callback)
+
+        ############# Action Clients ###################
+        self._takeoff_action_client = ActionClient(self, Takeoff, 'takeoff')
 
         ############### Publishers ##############
         
@@ -70,9 +86,6 @@ class MAV2(Node):
         self.global_position_sub =  self.create_subscriber(NavSatFix,'/mavros/global_position/global' , self.global_callback)
         self.extended_state_sub = self.create_subscriber(ExtendedState,'/mavros/extended_state', self.extended_state_callback, queue_size=2)
 
-        ########## Callback functions ###########
-
-
         service_timeout = 15
         while not self.set_mode_srv.wait_for_service(timeout_sec=service_timeout):
             self.get_logger().info('Set mode service not available, waiting again...')
@@ -83,6 +96,78 @@ class MAV2(Node):
         self.set_mode_req = 'mavros/set_mode'.Request()
         self.get_logger().info("Services are up")
         #self.future = self.NOMEDOSRV.call_async(self.req)
+
+    ########## Callback functions ###########
+    def takeoff_server_callback(self, height):
+        feedback_msg = Takeoff.Feedback()
+        
+        velocity = 1 # velocidade media
+
+        self.set_mode("OFFBOARD", 2)
+
+        if not self.drone_state.armed:
+            self.get_logger().warn("ARMING DRONE")
+            fb = self.arm(True)
+            while not fb.success:
+                if DEBUG:
+                    self.get_logger().warn("ARMING DRONE {}".format(fb))
+                fb = self.arm(True)
+                self.rate.sleep()
+            self.get_logger().info("DRONE ARMED")
+        else:
+            self.get_logger().info("DRONE ALREADY ARMED")
+        
+        self.rate.sleep()
+        self.get_logger().info('Executing takeoff methods...')
+        
+        p = self.drone_pose.pose.position.z
+        time = 0
+        #while abs(self.drone_pose.pose.position.z - height) >= TOL and not rclpy.is_shutdown():
+        while abs(self.takeoff_feedback - height) >= TOL and not rclpy.is_shutdown():
+            time += 1/60.0 #sec - init_time
+            
+            if p < height:
+                p = ((-2 * (velocity**3) * (time**3)) / height**2) + ((3*(time**2) * (velocity**2))/height)
+                self.drone_pose.pose.position.z = p
+            else:
+                self.drone_pose.pose.position.z = height
+        
+        actualHeight = self.drone_pose.pose.position.z 
+        
+        for i in range(1, height.request.height_request):
+            feedback_msg.partial_height = actualHeight
+            self.get_logger().info('Takeoff feedback: {0}'.format(feedback_msg.partial_height))
+            height.publish_feedback(feedback_msg)
+            time.sleep(1)
+
+        height.succeed()
+
+        result = Takeoff.Result()
+
+        result.height_result = feedback_msg.partial_height
+
+        return result
+
+
+    def takeoff_response_callback(self, future):
+        takeoff_handle = future.result()
+        if not takeoff_handle.accepted:
+            self.get_logger().info("Takeoff command DENIED")
+            return
+
+        self.get_logger().info("Takeoff command ACCEPTED")
+        
+        self._get_result_future = takeoff_handle.get_result_async()
+        self._get_result_future.add_done_callback(self.get_takeoff_result_callback)
+    
+    def get_takeoff_result_callback(self, future):
+        result = future.result().result
+        self.get_logger().info("Takeoff result: {0}".format(result.height_result))
+        rclpy.shutdown()
+
+    def takeoff_feedback_callback(self, feedback_msg):    
+        self._takeoff_feedback = feedback_msg.feedback
+        self.get_logger().info("Received takeoff feedback: {0}".format(self._takeoff_feedback.partial_height))
 
 
     ###Set mode: PX4 mode - string, timeout (seconds) - int
@@ -108,14 +193,28 @@ class MAV2(Node):
                 loop_rate.sleep()
             except Exception as e:
                 self.get_logger().info(e)
-        
+
+    def __takeoff(self, height):
+       height_goal_msg = Takeoff.Goal() 
+       height_goal_msg.height_request = height
+       
+       self._action_client.wait_for_server()
+       
+       self._send_takeoff_future = self._takeoff_client.send_goal_async(height_goal_msg, feedback_callback=self.takeoff_feedback_callback)
+
+       return self._send_takeoff_future.add_done_callback(self.takeoff_response_callback)
+                
+    def takeoff(self, height):
+       future = self.__takeoff(height)
+       rclpy.spin_until_future_complete(self, future)
+
     def land(self):
         # IMPLEMENTAR
         print()
         
         
     ########## Disarm #######
-    def _disarm(self):
+    def __disarm(self):
         self.get_logger().warn('DISARM MAV')
         self.arm_req = False
         if self.drone_pose.pose.position.z < TOL:

@@ -12,8 +12,8 @@ import rospy
 from sensor_msgs.msg import BatteryState, NavSatFix
 #from std_msgs.msg import String
 from rclpy.node import Node
-from rclpy.action import ActionServer  
-from rclpy.action import ActionClient   
+from rclpy.action import ActionServer
+from rclpy.action import ActionClient
 import numpy as np
 import math
 import time
@@ -53,14 +53,14 @@ class MAV2(Node):
         self.battery = BatteryState()
         self.global_pose = NavSatFix()
         self.gps_target = GeoPoseStamped()
-        
+
         ############# Services ##################
-        
+
         self.set_mode_srv = self.create_client('/mavros/set_mode', SetMode)
-        
+
         self.arm = self.create_client('/mavros/cmd/arming', CommandBool)
-         
-        
+
+
         ############## Action Servers ##################
         self._action_server = ActionServer(
             self,
@@ -72,16 +72,16 @@ class MAV2(Node):
         self._takeoff_action_client = ActionClient(self, Takeoff, 'takeoff')
 
         ############### Publishers ##############
-        
+
         self.local_position_pub = self.create_publisher(PoseStamped, '/mavros/setpoint_position/local', queue_size = 20)
         self.velocity_pub = self.create_publisher(TwistStamped,  '/mavros/setpoint_velocity/cmd_vel', queue_size=5)
         self.target_pub = self.create_publisher(PositionTarget, '/mavros/setpoint_raw/local', queue_size=5)
         self.global_position_pub = self.create_publisher(GeoPoseStamped, '/mavros/setpoint_position/global', queue_size= 20)
-        
+
         ########## Subscribers ##################
 
         self.local_atual = self.create_subscriber(PoseStamped, '/mavros/setpoint_position/local', self.local_callback)
-        self.state_sub =  self.create_subscriber(State, '/mavros/state', self.state_callback, queue_size=10) 
+        self.state_sub =  self.create_subscriber(State, '/mavros/state', self.state_callback, queue_size=10)
         self.battery_sub =  self.create_subscriber(BatteryState, '/mavros/battery', self.battery_callback)
         self.global_position_sub =  self.create_subscriber(NavSatFix,'/mavros/global_position/global' , self.global_callback)
         self.extended_state_sub = self.create_subscriber(ExtendedState,'/mavros/extended_state', self.extended_state_callback, queue_size=2)
@@ -91,7 +91,7 @@ class MAV2(Node):
             self.get_logger().info('Set mode service not available, waiting again...')
         while not self.arm.wait_for_service(timeout_sec=service_timeout):
             self.get_logger().info('Arm service not available, waiting again...')
-            
+
         self.arm_req = 'mavros/cmd/arming'.Request()
         self.set_mode_req = 'mavros/set_mode'.Request()
         self.get_logger().info("Services are up")
@@ -99,8 +99,9 @@ class MAV2(Node):
 
     ########## Callback functions ###########
     def takeoff_server_callback(self, height):
+        self.get_logger().info("Executing takeoff...")
+
         feedback_msg = Takeoff.Feedback()
-        
         velocity = 1 # velocidade media
 
         self.set_mode("OFFBOARD", 2)
@@ -116,24 +117,24 @@ class MAV2(Node):
             self.get_logger().info("DRONE ARMED")
         else:
             self.get_logger().info("DRONE ALREADY ARMED")
-        
+
         self.rate.sleep()
         self.get_logger().info('Executing takeoff methods...')
-        
+
         p = self.drone_pose.pose.position.z
         time = 0
         #while abs(self.drone_pose.pose.position.z - height) >= TOL and not rclpy.is_shutdown():
         while abs(self.takeoff_feedback - height) >= TOL and not rclpy.is_shutdown():
             time += 1/60.0 #sec - init_time
-            
+
             if p < height:
                 p = ((-2 * (velocity**3) * (time**3)) / height**2) + ((3*(time**2) * (velocity**2))/height)
                 self.drone_pose.pose.position.z = p
             else:
                 self.drone_pose.pose.position.z = height
-        
-        actualHeight = self.drone_pose.pose.position.z 
-        
+
+        actualHeight = self.drone_pose.pose.position.z
+
         for i in range(1, height.request.height_request):
             feedback_msg.partial_height = actualHeight
             self.get_logger().info('Takeoff feedback: {0}'.format(feedback_msg.partial_height))
@@ -149,6 +150,7 @@ class MAV2(Node):
         return result
 
 
+    # Takeoff server call response
     def takeoff_response_callback(self, future):
         takeoff_handle = future.result()
         if not takeoff_handle.accepted:
@@ -156,16 +158,18 @@ class MAV2(Node):
             return
 
         self.get_logger().info("Takeoff command ACCEPTED")
-        
+
         self._get_result_future = takeoff_handle.get_result_async()
         self._get_result_future.add_done_callback(self.get_takeoff_result_callback)
-    
+
+    # Takeoff height after takeoff method completion
     def get_takeoff_result_callback(self, future):
         result = future.result().result
         self.get_logger().info("Takeoff result: {0}".format(result.height_result))
         rclpy.shutdown()
 
-    def takeoff_feedback_callback(self, feedback_msg):    
+    # Takeoff height durind ascension
+    def takeoff_feedback_callback(self, feedback_msg):
         self._takeoff_feedback = feedback_msg.feedback
         self.get_logger().info("Received takeoff feedback: {0}".format(self._takeoff_feedback.partial_height))
 
@@ -195,15 +199,15 @@ class MAV2(Node):
                 self.get_logger().info(e)
 
     def __takeoff(self, height):
-       height_goal_msg = Takeoff.Goal() 
+       height_goal_msg = Takeoff.Goal()
        height_goal_msg.height_request = height
-       
+
        self._action_client.wait_for_server()
-       
+
        self._send_takeoff_future = self._takeoff_client.send_goal_async(height_goal_msg, feedback_callback=self.takeoff_feedback_callback)
 
        return self._send_takeoff_future.add_done_callback(self.takeoff_response_callback)
-                
+
     def takeoff(self, height):
        future = self.__takeoff(height)
        rclpy.spin_until_future_complete(self, future)
@@ -211,8 +215,8 @@ class MAV2(Node):
     def land(self):
         # IMPLEMENTAR
         print()
-        
-        
+
+
     ########## Disarm #######
     def __disarm(self):
         self.get_logger().warn('DISARM MAV')
@@ -227,7 +231,7 @@ class MAV2(Node):
             self.get_logger().warn('Altitude too high for disarming!')
             self.land()
             self.arm.call_async(self.arm_req)
-        
+
 
 
 if __name__ == '__main__':

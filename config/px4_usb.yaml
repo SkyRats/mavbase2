@@ -7,7 +7,9 @@ mavros_router:
 mavros_node:
   ros__parameters:
     fcu_url: /dev/ttyACM0:115200
-    uas_url: /uav1
+    gcs_url: tcp-l://:5670
+    tgt_system: 1
+    tgt_component: 1
 
 /**:
   ros__parameters:

@@ -1,0 +1,15 @@
+mavros:
+  ros__parameters: {}
+
+mavros_router:
+  ros__parameters: {}
+
+mavros_node:
+  ros__parameters:
+    fcu_url: /dev/ttyACM0:115200
+    uas_url: /uav1
+
+/**:
+  ros__parameters:
+    plugin_denylist: [odometry]
+    # plugin_allowlist: []

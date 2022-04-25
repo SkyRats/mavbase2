@@ -56,9 +56,9 @@ class MAV2(Node):
 
         ############# Services ##################
 
-        self.set_mode_srv = self.create_client('/mavros/set_mode', SetMode)
+        self.set_mode_srv = self.create_client(SetMode, '/mavros/set_mode')
 
-        self.arm = self.create_client('/mavros/cmd/arming', CommandBool)
+        self.arm = self.create_client(CommandBool, '/mavros/cmd/arming')
 
 
         ############## Action Servers ##################
@@ -92,8 +92,8 @@ class MAV2(Node):
         while not self.arm.wait_for_service(timeout_sec=service_timeout):
             self.get_logger().info('Arm service not available, waiting again...')
 
-        self.arm_req = 'mavros/cmd/arming'.Request()
-        self.set_mode_req = 'mavros/set_mode'.Request()
+        self.arm_req = CommandBool.Request()
+        self.set_mode_req = SetMode.Request()
         self.get_logger().info("Services are up")
         #self.future = self.NOMEDOSRV.call_async(self.req)
 

@@ -1,4 +1,4 @@
-from asyncio.windows_events import NULL
+#from asyncio.windows_events import NULL
 from tkinter import SEL
 from turtle import position
 import rclpy
@@ -8,17 +8,17 @@ from mavros_msgs.srv import SetMode, CommandBool
 from mavros_msgs.msg import State, ExtendedState, PositionTarget
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from geographic_msgs.msg import GeoPoseStamped
-import rospy
 from sensor_msgs.msg import BatteryState, NavSatFix
-#from std_msgs.msg import String
+from std_msgs.msg import String
 from rclpy.node import Node
 from rclpy.action import ActionServer
 from rclpy.action import ActionClient
 import numpy as np
 import math
 import time
+import sys
 
-from action import Takeoff
+from mavbase2.action import Takeoff
 
 
 TOL = 0.3
@@ -73,18 +73,18 @@ class MAV2(Node):
 
         ############### Publishers ##############
 
-        self.local_position_pub = self.create_publisher(PoseStamped, '/mavros/setpoint_position/local', queue_size = 20)
-        self.velocity_pub = self.create_publisher(TwistStamped,  '/mavros/setpoint_velocity/cmd_vel', queue_size=5)
-        self.target_pub = self.create_publisher(PositionTarget, '/mavros/setpoint_raw/local', queue_size=5)
-        self.global_position_pub = self.create_publisher(GeoPoseStamped, '/mavros/setpoint_position/global', queue_size= 20)
+        self.local_position_pub = self.create_publisher(PoseStamped, '/mavros/setpoint_position/local', 20)
+        self.velocity_pub = self.create_publisher(TwistStamped,  '/mavros/setpoint_velocity/cmd_vel', 5)
+        self.target_pub = self.create_publisher(PositionTarget, '/mavros/setpoint_raw/local', 5)
+        self.global_position_pub = self.create_publisher(GeoPoseStamped, '/mavros/setpoint_position/global', 20)
 
         ########## Subscribers ##################
 
-        self.local_atual = self.create_subscriber(PoseStamped, '/mavros/setpoint_position/local', self.local_callback)
-        self.state_sub =  self.create_subscriber(State, '/mavros/state', self.state_callback, queue_size=10)
-        self.battery_sub =  self.create_subscriber(BatteryState, '/mavros/battery', self.battery_callback)
-        self.global_position_sub =  self.create_subscriber(NavSatFix,'/mavros/global_position/global' , self.global_callback)
-        self.extended_state_sub = self.create_subscriber(ExtendedState,'/mavros/extended_state', self.extended_state_callback, queue_size=2)
+        #self.local_atual = self.create_subscription(PoseStamped, '/mavros/setpoint_position/local', self.local_callback)
+        #self.state_sub =  self.create_subscription(State, '/mavros/state', self.state_callback, queue_size=10)
+        #self.battery_sub =  self.create_subscription(BatteryState, '/mavros/battery', self.battery_callback)
+        #self.global_position_sub =  self.create_subscription(NavSatFix,'/mavros/global_position/global' , self.global_callback)
+        #self.extended_state_sub = self.create_subscription(ExtendedState,'/mavros/extended_state', self.extended_state_callback, queue_size=2)
 
         service_timeout = 15
         while not self.set_mode_srv.wait_for_service(timeout_sec=service_timeout):
@@ -200,11 +200,11 @@ class MAV2(Node):
 
     def __takeoff(self, height):
        height_goal_msg = Takeoff.Goal()
-       height_goal_msg.height_request = height
+       height_goal_msg.height_request = float(height)
 
-       self._action_client.wait_for_server()
+       self._takeoff_action_client.wait_for_server()
 
-       self._send_takeoff_future = self._takeoff_client.send_goal_async(height_goal_msg, feedback_callback=self.takeoff_feedback_callback)
+       self._send_takeoff_future = self._takeoff_action_client.send_goal_async(height_goal_msg, feedback_callback=self.takeoff_feedback_callback)
 
        return self._send_takeoff_future.add_done_callback(self.takeoff_response_callback)
 
@@ -236,6 +236,5 @@ class MAV2(Node):
 
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
-    mav = MAV2("jorge")
+    mav = MAV2()
     mav.takeoff(3)
-    mav.RTL()

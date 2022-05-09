@@ -98,6 +98,7 @@ class MAV2(Node):
         #self.future = self.NOMEDOSRV.call_async(self.req)
 
     ########## Callback functions ###########
+
     def takeoff_server_callback(self, height):
         self.get_logger().info("Executing takeoff...")
 
@@ -173,6 +174,8 @@ class MAV2(Node):
         self._takeoff_feedback = feedback_msg.feedback
         self.get_logger().info("Received takeoff feedback: {0}".format(self._takeoff_feedback.partial_height))
 
+    def local_callback(self, data):
+        drone_pose = data
 
     ###Set mode: PX4 mode - string, timeout (seconds) - int
     def set_mode(self, mode, timeout):
@@ -212,15 +215,49 @@ class MAV2(Node):
        future = self.__takeoff(height)
        rclpy.spin_until_future_complete(self, future)
 
+    ####### Goal Position and Velocity #########
+    def set_position(self, x, y, z):
+        self.goal_pose.pose.position.x = x
+        self.goal_pose.pose.position.y = y
+        self.goal_pose.pose.position.z = z
+        self.local_position_pub.publish(self.goal_pose)
+        self.rate.sleep()
+        
+    def set_vel(self, x, y, z, roll = 0, pitch = 0, yaw = 0):
+        self.goal_vel.twist.linear.x = x 
+        self.goal_vel.twist.linear.y = y
+        self.goal_vel.twist.linear.z = z 
+
+        self.goal_vel.twist.angular.x = roll
+        self.goal_vel.twist.angular.y = pitch
+        self.goal_vel.twist.angular.z = yaw
+        self.velocity_pub.publish(self.goal_vel)    
+
+
+
     def land(self):
-        # IMPLEMENTAR
-        print()
+        velocity = 0.7 
+        init_time = self.get_clock().now()
+        self.arm_req.value = False
+        height = self.drone_pose.pose.position.z
+        self.rate.sleep()
+        self.get_logger().warn('Landing')
+        while not self.get_clock() - init_time > (height/velocity)*1.3 or self.drone_pose.pose.position.z == 0:
+            if DEBUG:
+                self.get_logger().info('Height: ' + str(abs(self.drone_pose.pose.position.z)))
+            ######### Velocity Control ##########
+            self.set_vel(0, 0, -velocity, 0, 0, 0) 
+            self.rate.sleep
+        self.get_logger().warn('LANDED_STATE: ON GROUND\nDISARMING')
+        self.arm.call_async(self.arm_req)
+        
+        return "succeeded"
 
 
     ########## Disarm #######
     def __disarm(self):
         self.get_logger().warn('DISARM MAV')
-        self.arm_req = False
+        self.arm_req.value = False
         if self.drone_pose.pose.position.z < TOL:
             for i in range(3):
                 self.arm.call_async(self.arm_req)

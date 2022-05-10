@@ -192,7 +192,7 @@ class MAV2(Node):
             else:
                 try:
                     result = self.set_mode_srv.call_async(self.set_mode_req)  # 0 is custom mode
-                    if not result.mode_sent:
+                    if not result.success:
                         self.get_logger().info("failed to send mode command")
                 except Exception as e:
                     self.get_logger().info(e)
@@ -208,8 +208,8 @@ class MAV2(Node):
        self._takeoff_action_client.wait_for_server()
 
        self._send_takeoff_future = self._takeoff_action_client.send_goal_async(height_goal_msg, feedback_callback=self.takeoff_feedback_callback)
-
-       return self._send_takeoff_future.add_done_callback(self.takeoff_response_callback)
+       self._send_takeoff_future.add_done_callback(self.takeoff_response_callback)
+       return self._send_takeoff_future
 
     def takeoff(self, height):
        future = self.__takeoff(height)
@@ -274,4 +274,6 @@ class MAV2(Node):
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
+    #mav.set_mode('OFFBOARD',2)
+    
     mav.takeoff(3)

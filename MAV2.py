@@ -98,6 +98,10 @@ class MAV2(Node):
         #self.future = self.NOMEDOSRV.call_async(self.req)
 
     ########## Callback functions ###########
+    def state_callback(self, state_data):
+        self.drone_state = state_data
+        if self.drone_state.mode != self.desired_state:
+            self.set_mode_srv(0, self.desired_state)
 
     def takeoff_server_callback(self, height):
         self.get_logger().info("Executing takeoff...")
@@ -191,8 +195,10 @@ class MAV2(Node):
                 break
             else:
                 try:
+                    self.set_mode_req.base_mode = 0
+                    self.set_mode_req.custom_mode = mode
                     result = self.set_mode_srv.call_async(self.set_mode_req)  # 0 is custom mode
-                    if not result.success:
+                    if not result.mode_sent:
                         self.get_logger().info("failed to send mode command")
                 except Exception as e:
                     self.get_logger().info(e)

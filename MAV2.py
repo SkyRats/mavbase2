@@ -197,8 +197,8 @@ class MAV2(Node):
                 try:
                     self.set_mode_req.base_mode = 0
                     self.set_mode_req.custom_mode = mode
-                    result = self.set_mode_srv.call_async(self.set_mode_req)  # 0 is custom mode
-                    if not result.mode_sent:
+                    future = self.set_mode_srv.call_async(self.set_mode_req)  # 0 is custom mode
+                    if not future.result().mode_sent:
                         self.get_logger().info("failed to send mode command")
                 except Exception as e:
                     self.get_logger().info(e)

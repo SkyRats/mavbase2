@@ -4,7 +4,7 @@ from turtle import position
 import rclpy
 import mavros_msgs
 from mavros_msgs import srv
-from mavros_msgs.srv import SetMode, CommandBool
+from mavros_msgs.srv import SetMode, CommandBool, CommandTOL
 from mavros_msgs.msg import State, ExtendedState, PositionTarget
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from geographic_msgs.msg import GeoPoseStamped
@@ -58,9 +58,11 @@ class MAV2(Node):
 
         self.set_mode_srv = self.create_client(SetMode, '/mavros/set_mode')
 
-        self.arm = self.create_client(CommandBool, '/mavros/cmd/arming')
+        self.arm_srv = self.create_client(CommandBool, '/mavros/cmd/arming')
 
+        
 
+        '''
         ############## Action Servers ##################
         self._action_server = ActionServer(
             self,
@@ -70,6 +72,7 @@ class MAV2(Node):
 
         ############# Action Clients ###################
         self._takeoff_action_client = ActionClient(self, Takeoff, 'takeoff')
+        '''
 
         ############### Publishers ##############
 
@@ -89,7 +92,7 @@ class MAV2(Node):
         service_timeout = 15
         while not self.set_mode_srv.wait_for_service(timeout_sec=service_timeout):
             self.get_logger().info('Set mode service not available, waiting again...')
-        while not self.arm.wait_for_service(timeout_sec=service_timeout):
+        while not self.arm_srv.wait_for_service(timeout_sec=service_timeout):
             self.get_logger().info('Arm service not available, waiting again...')
 
         self.arm_req = CommandBool.Request()
@@ -100,9 +103,8 @@ class MAV2(Node):
     ########## Callback functions ###########
     def state_callback(self, state_data):
         self.drone_state = state_data
-        if self.drone_state.mode != self.desired_state:
-            self.set_mode_srv(0, self.desired_state)
 
+    '''
     def takeoff_server_callback(self, height):
         self.get_logger().info("Executing takeoff...")
 
@@ -178,6 +180,8 @@ class MAV2(Node):
         self._takeoff_feedback = feedback_msg.feedback
         self.get_logger().info("Received takeoff feedback: {0}".format(self._takeoff_feedback.partial_height))
 
+    '''
+
     def local_callback(self, data):
         drone_pose = data
 
@@ -198,15 +202,15 @@ class MAV2(Node):
                     self.set_mode_req.base_mode = 0
                     self.set_mode_req.custom_mode = mode
                     future = self.set_mode_srv.call_async(self.set_mode_req)  # 0 is custom mode
-                    if not future.result().mode_sent:
-                        self.get_logger().info("failed to send mode command")
+                    #if not future.result().mode_sent:
+                    #    self.get_logger().info("failed to send mode command")
                 except Exception as e:
                     self.get_logger().info(e)
             try:
                 loop_rate.sleep()
             except Exception as e:
                 self.get_logger().info(e)
-
+    '''
     def __takeoff(self, height):
        height_goal_msg = Takeoff.Goal()
        height_goal_msg.height_request = float(height)
@@ -220,6 +224,11 @@ class MAV2(Node):
     def takeoff(self, height):
        future = self.__takeoff(height)
        rclpy.spin_until_future_complete(self, future)
+
+    '''
+    def takeoff(self):
+        self.__arm()
+        self.set_mode("AUTO.TAKEOFF", 2)
 
     ####### Goal Position and Velocity #########
     def set_position(self, x, y, z):
@@ -242,23 +251,14 @@ class MAV2(Node):
 
 
     def land(self):
-        velocity = 0.7 
-        init_time = self.get_clock().now()
-        self.arm_req.value = False
-        height = self.drone_pose.pose.position.z
-        self.rate.sleep()
-        self.get_logger().warn('Landing')
-        while not self.get_clock() - init_time > (height/velocity)*1.3 or self.drone_pose.pose.position.z == 0:
-            if DEBUG:
-                self.get_logger().info('Height: ' + str(abs(self.drone_pose.pose.position.z)))
-            ######### Velocity Control ##########
-            self.set_vel(0, 0, -velocity, 0, 0, 0) 
-            self.rate.sleep
-        self.get_logger().warn('LANDED_STATE: ON GROUND\nDISARMING')
-        self.arm.call_async(self.arm_req)
-        
-        return "succeeded"
+        self.set_mode('AUTO.LAND',2)
 
+    ########## Arm #######
+    def __arm(self):
+        self.get_logger().warn('ARM MAV')
+        self.arm_req.value = True
+        self.arm_srv.call_async(self.arm_req)
+        
 
     ########## Disarm #######
     def __disarm(self):
@@ -266,20 +266,20 @@ class MAV2(Node):
         self.arm_req.value = False
         if self.drone_pose.pose.position.z < TOL:
             for i in range(3):
-                self.arm.call_async(self.arm_req)
+                self.arm_srv.call_async(self.arm_req)
                 if DEBUG:
                     self.get_logger().info('Drone height' + str(self.drone_pose.pose.position.z))
 
         else:
             self.get_logger().warn('Altitude too high for disarming!')
             self.land()
-            self.arm.call_async(self.arm_req)
+            self.arm_srv.call_async(self.arm_req)
 
 
 
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
-    #mav.set_mode('OFFBOARD',2)
+    #mav.set_mode('AUTO.LAND',2)
     
-    mav.takeoff(3)
+    mav.takeoff()

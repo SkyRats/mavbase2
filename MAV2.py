@@ -83,8 +83,8 @@ class MAV2(Node):
 
         ########## Subscribers ##################
 
-        #self.local_atual = self.create_subscription(PoseStamped, '/mavros/setpoint_position/local', self.local_callback)
-        #self.state_sub =  self.create_subscription(State, '/mavros/state', self.state_callback, queue_size=10)
+        self.local_atual = self.create_subscription(PoseStamped, '/mavros/setpoint_position/local', self.local_callback)
+        self.state_sub =  self.create_subscription(State, '/mavros/state', self.state_callback, queue_size=10)
         #self.battery_sub =  self.create_subscription(BatteryState, '/mavros/battery', self.battery_callback)
         #self.global_position_sub =  self.create_subscription(NavSatFix,'/mavros/global_position/global' , self.global_callback)
         #self.extended_state_sub = self.create_subscription(ExtendedState,'/mavros/extended_state', self.extended_state_callback, queue_size=2)
@@ -103,6 +103,8 @@ class MAV2(Node):
     ########## Callback functions ###########
     def state_callback(self, state_data):
         self.drone_state = state_data
+        if self.drone_state.mode != self.desired_state:
+            self.set_mode(self.desired_state, 2)
 
     '''
     def takeoff_server_callback(self, height):
@@ -183,7 +185,9 @@ class MAV2(Node):
     '''
 
     def local_callback(self, data):
-        drone_pose = data
+        self.drone_pose.pose.position.x = data.pose.position.x
+        self.drone_pose.pose.position.y = data.pose.position.y
+        self.drone_pose.pose.position.z = data.pose.position.z
 
     ###Set mode: PX4 mode - string, timeout (seconds) - int
     def set_mode(self, mode, timeout):

@@ -83,7 +83,7 @@ class MAV2(Node):
 
         ########## Subscribers ##################
 
-        self.local_atual = self.create_subscription(PoseStamped, '/mavros/setpoint_position/local', self.local_callback)
+        self.local_atual = self.create_subscription(PoseStamped, '/mavros/local_position/pose', self.local_callback)
         self.state_sub =  self.create_subscription(State, '/mavros/state', self.state_callback, queue_size=10)
         #self.battery_sub =  self.create_subscription(BatteryState, '/mavros/battery', self.battery_callback)
         #self.global_position_sub =  self.create_subscription(NavSatFix,'/mavros/global_position/global' , self.global_callback)

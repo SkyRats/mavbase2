@@ -5,6 +5,8 @@ import rclpy
 import mavros_msgs
 from mavros_msgs import srv
 from mavros_msgs.srv import SetMode, CommandBool, CommandTOL
+from rcl_interfaces.msg import ParameterType, Parameter, ParameterValue
+from rcl_interfaces.srv import SetParameters
 from mavros_msgs.msg import State, ExtendedState, PositionTarget
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from geographic_msgs.msg import GeoPoseStamped
@@ -60,6 +62,7 @@ class MAV2(Node):
 
         self.arm_srv = self.create_client(CommandBool, '/mavros/cmd/arming')
 
+        self.param_set_srv = self.create_client(SetParameters,'/mavros/param/set_parameters')
         
 
         '''
@@ -93,9 +96,12 @@ class MAV2(Node):
             self.get_logger().info('Set mode service not available, waiting again...')
         while not self.arm_srv.wait_for_service(timeout_sec=service_timeout):
             self.get_logger().info('Arm service not available, waiting again...')
+        while not self.param_set_srv.wait_for_service(timeout_sec=service_timeout):
+            self.get_logger().info('Set param service not available, waiting again')
 
         self.arm_req = CommandBool.Request()
         self.set_mode_req = SetMode.Request()
+        self.param_set_req = SetParameters.Request()
         self.get_logger().info("Services are up")
         #self.future = self.NOMEDOSRV.call_async(self.req)
 
@@ -220,6 +226,11 @@ class MAV2(Node):
                 loop_rate.sleep()
             except Exception as e:
                 self.get_logger().info(e)
+    
+    def set_param(self, param_value):
+        self.param_set_req.parameters = [param_value]
+        self.param_set_srv.call_async(self.param_set_req)
+
     '''
     def __setPosition (self, x, y, z):
        height_goal_msg = Takeoff.Goal()
@@ -236,7 +247,16 @@ class MAV2(Node):
        rclpy.spin_until_future_complete(self, future)
 
     '''
-    def takeoff(self):
+    def takeoff(self, height, speed=1.5):
+        height = float(height)
+
+        alt_param_value = Parameter(name= 'MIS_TAKEOFF_ALT', value=ParameterValue(double_value=height, type=ParameterType.PARAMETER_DOUBLE))
+        self.set_param(alt_param_value)
+        
+        speed = float(speed)
+        speed_param_value = Parameter(name= 'MPC_TKO_SPEED', value=ParameterValue(double_value=speed, type=ParameterType.PARAMETER_DOUBLE))
+        self.set_param(speed_param_value)
+
         self.__arm()
         self.set_mode("AUTO.TAKEOFF", 2)
 
@@ -261,37 +281,47 @@ class MAV2(Node):
     """
 
 
-    def land(self):
+    def land(self, auto_disarm=True, speed=0.7):
+        if auto_disarm:
+            auto_disarm_param_value= Parameter(name= 'COM_DISARM_LAND', value=ParameterValue(double_value= 2.0, type=ParameterType.PARAMETER_DOUBLE))
+        else:
+            auto_disarm_param_value= Parameter(name= 'COM_DISARM_LAND', value=ParameterValue(double_value= -1.0, type=ParameterType.PARAMETER_DOUBLE))
+        self.set_param(auto_disarm_param_value)
+
+        speed = float(speed)
+        land_speed_param_value= Parameter(name= 'MPC_LAND_SPEED', value=ParameterValue(double_value= speed, type=ParameterType.PARAMETER_DOUBLE))
+        self.set_param(land_speed_param_value)
+
         self.set_mode('AUTO.LAND',2)
 
     ########## Arm #######
-    '''
+
     def __arm(self):
-        self.get_logger().warn('ARM MAV')
+        self.get_logger().warn('ARMING MAV')
         self.arm_req.value = True
         self.arm_srv.call_async(self.arm_req)
         
 
     ########## Disarm #######
     def __disarm(self):
-        self.get_logger().warn('DISARM MAV')
+        self.get_logger().warn('DISARMING MAV')
         self.arm_req.value = False
-        if self.drone_pose.pose.position.z < TOL:
-            for i in range(3):
-                self.arm_srv.call_async(self.arm_req)
-                if DEBUG:
-                    self.get_logger().info('Drone height' + str(self.drone_pose.pose.position.z))
+        self.arm_srv.call_async(self.arm_req) #substituir isso por um metodo mais seguro depois
+        #if self.drone_pose.pose.position.z < TOL:
+        #    for i in range(3):
+                #self.arm_srv.call_async(self.arm_req)
+        #        if DEBUG:
+        #            self.get_logger().info('Drone height' + str(self.drone_pose.pose.position.z))
+        #
+        #else:
+        #    self.get_logger().warn('Altitude too high for disarming!')
+        #    self.land()
+        #    self.arm_srv.call_async(self.arm_req)
 
-        else:
-            self.get_logger().warn('Altitude too high for disarming!')
-            self.land()
-            self.arm_srv.call_async(self.arm_req)
-'''
 
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
-    #mav.set_mode('AUTO.LAND',2)
-    rclpy.spin(mav)
-    
-    mav.takeoff()
+    mav.takeoff(5)
+    #mav.land()
+    #rclpy.spin(mav)

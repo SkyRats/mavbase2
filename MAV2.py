@@ -13,8 +13,8 @@ from geographic_msgs.msg import GeoPoseStamped
 from sensor_msgs.msg import BatteryState, NavSatFix
 from std_msgs.msg import String
 from rclpy.node import Node
-from rclpy.action import ActionServer
-from rclpy.action import ActionClient
+from rclpy.action import ActionServer, ActionClient
+from rclpy import qos
 import numpy as np
 import math
 import time
@@ -86,10 +86,10 @@ class MAV2(Node):
 
         ########## Subscribers ##################
 
-        self.local_atual = self.create_subscription(PoseStamped, '/mavros/local_position/pose', self.local_callback, 10)
-        self.state_sub =  self.create_subscription(State, '/mavros/state', self.state_callback, 10)
-        self.battery_sub =  self.create_subscription(BatteryState, '/mavros/battery', self.battery_callback, 10)
-        self.global_position_sub =  self.create_subscription(NavSatFix,'/mavros/global_position/global' , self.global_callback, 10)
+        self.local_atual = self.create_subscription(PoseStamped, '/mavros/local_position/pose', self.local_callback, qos.qos_profile_sensor_data)
+        self.state_sub =  self.create_subscription(State, '/mavros/state', self.state_callback, qos.qos_profile_sensor_data)
+        self.battery_sub =  self.create_subscription(BatteryState, '/mavros/battery', self.battery_callback, qos.qos_profile_sensor_data)
+        self.global_position_sub =  self.create_subscription(NavSatFix,'/mavros/global_position/global' , self.global_callback, qos.qos_profile_sensor_data)
 
         service_timeout = 15
         while not self.set_mode_srv.wait_for_service(timeout_sec=service_timeout):
@@ -97,7 +97,7 @@ class MAV2(Node):
         while not self.arm_srv.wait_for_service(timeout_sec=service_timeout):
             self.get_logger().info('Arm service not available, waiting again...')
         while not self.param_set_srv.wait_for_service(timeout_sec=service_timeout):
-            self.get_logger().info('Set param service not available, waiting again')
+            self.get_logger().info('Set param service not available, waiting again...')
 
         self.arm_req = CommandBool.Request()
         self.set_mode_req = SetMode.Request()
@@ -113,7 +113,16 @@ class MAV2(Node):
     
     def state_callback(self, state_data):
         self.drone_state = state_data
+
+    def battery_callback (self, battery_data):
+        self.battery = battery_data
     
+    def local_callback(self, data):
+        self.drone_pose = data
+    
+    def global_callback(self, global_data):
+        self.global_pose = global_data
+
     '''
     def setposition_server_callback(self, height):
         self.get_logger().info("...")
@@ -191,21 +200,6 @@ class MAV2(Node):
         self.get_logger().info("Received set position feedback: {0}".format(self._setposition_feedback.partial_height))
 
     '''
-    
-    def battery_callback (self, battery_data):
-        print("b")
-        self.battery = battery_data
-    
-    def local_callback(self, data):
-        print("c")
-        self.drone_pose.pose.position.x = data.pose.position.x
-        self.drone_pose.pose.position.y = data.pose.position.y
-        self.drone_pose.pose.position.z = data.pose.position.z
-
-    
-    def global_callback(self, global_data):
-        print("d")
-        self.global_pose = global_data
     
     
     ###Set mode: PX4 mode - string, timeout (seconds) - int
@@ -337,6 +331,5 @@ if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
     mav.takeoff(5)
-    #mav.land()
-    print("cabou")
-    rclpy.spin(mav)
+    mav.land()
+    #rclpy.spin(mav)

@@ -103,6 +103,10 @@ class MAV2(Node):
         self.set_mode_req = SetMode.Request()
         self.param_set_req = SetParameters.Request()
         self.get_logger().info("Services are up")
+
+        while self.drone_state.mode == "":
+            rclpy.spin_once(self)
+        print("Subscribers are up")
         #self.future = self.NOMEDOSRV.call_async(self.req)
 
     ########## Callback functions ###########
@@ -189,15 +193,18 @@ class MAV2(Node):
     '''
     
     def battery_callback (self, battery_data):
+        print("b")
         self.battery = battery_data
     
     def local_callback(self, data):
+        print("c")
         self.drone_pose.pose.position.x = data.pose.position.x
         self.drone_pose.pose.position.y = data.pose.position.y
         self.drone_pose.pose.position.z = data.pose.position.z
 
     
     def global_callback(self, global_data):
+        print("d")
         self.global_pose = global_data
     
     
@@ -222,10 +229,10 @@ class MAV2(Node):
                     #    self.get_logger().info("failed to send mode command")
                 except Exception as e:
                     self.get_logger().info(e)
-            try:
-                loop_rate.sleep()
-            except Exception as e:
-                self.get_logger().info(e)
+            #try:
+            #    loop_rate.sleep()
+            #except Exception as e:
+            #    self.get_logger().info(e)
     
     def set_param(self, param_value):
         self.param_set_req.parameters = [param_value]
@@ -247,7 +254,7 @@ class MAV2(Node):
        rclpy.spin_until_future_complete(self, future)
 
     '''
-    def takeoff(self, height, speed=1.5):
+    def takeoff(self, height, speed=1.5, safety_on=True):
         height = float(height)
 
         alt_param_value = Parameter(name= 'MIS_TAKEOFF_ALT', value=ParameterValue(double_value=height, type=ParameterType.PARAMETER_DOUBLE))
@@ -259,6 +266,13 @@ class MAV2(Node):
 
         self.__arm()
         self.set_mode("AUTO.TAKEOFF", 2)
+        
+        #safety measures: locks program while taking off
+        if safety_on:
+            while self.drone_state.mode != "AUTO.TAKEOFF":
+                rclpy.spin_once(self)
+            while self.drone_state.mode == "AUTO.TAKEOFF":
+                rclpy.spin_once(self)
 
     """
     ####### Goal Position and Velocity #########
@@ -306,7 +320,7 @@ class MAV2(Node):
     def __disarm(self):
         self.get_logger().warn('DISARMING MAV')
         self.arm_req.value = False
-        self.arm_srv.call_async(self.arm_req) #substituir isso por um metodo mais seguro depois
+        self.arm_srv.call_async(self.arm_req) #substituir isso por um metodo mais seguro depois (comentei pq o subscriber de pose n ta funcionando)
         #if self.drone_pose.pose.position.z < TOL:
         #    for i in range(3):
                 #self.arm_srv.call_async(self.arm_req)
@@ -324,4 +338,5 @@ if __name__ == '__main__':
     mav = MAV2()
     mav.takeoff(5)
     #mav.land()
-    #rclpy.spin(mav)
+    print("cabou")
+    rclpy.spin(mav)

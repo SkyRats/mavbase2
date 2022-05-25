@@ -218,15 +218,18 @@ class MAV2(Node):
                 try:
                     self.set_mode_req.base_mode = 0
                     self.set_mode_req.custom_mode = mode
-                    future = self.set_mode_srv.call_async(self.set_mode_req)  # 0 is custom mode
-                    #if not future.result().mode_sent:
-                    #    self.get_logger().info("failed to send mode command")
+                    self.set_mode_srv.call_async(self.set_mode_req)  # 0 is custom mode
+                    if not future.result().mode_sent:
+                        self.get_logger().info("failed to send mode command")
+                    if self.drone_state.mode == mode:
+                        mode_set = True
+                        break
                 except Exception as e:
                     self.get_logger().info(e)
-            #try:
-            #    loop_rate.sleep()
-            #except Exception as e:
-            #    self.get_logger().info(e)
+            try:
+                loop_rate.sleep()
+            except Exception as e:
+                self.get_logger().info(e)
     
     def set_param(self, param_value):
         self.param_set_req.parameters = [param_value]

@@ -106,7 +106,7 @@ class MAV2(Node):
 
         while self.drone_state.mode == "":
             rclpy.spin_once(self)
-        print("Subscribers are up")
+        self.get_logger().info("Subscribers are up")
         #self.future = self.NOMEDOSRV.call_async(self.req)
 
     ########## Callback functions ###########
@@ -130,7 +130,7 @@ class MAV2(Node):
         feedback_msg = setPosition.Feedback()
         velocity = 1 # velocidade media
 
-        self.set_mode("OFFBOARD", 2)
+        self.set_mode("OFFBOARD")
 
         if not self.drone_state.armed:
             self.get_logger().warn("ARMING DRONE")
@@ -203,34 +203,16 @@ class MAV2(Node):
     
     
     ###Set mode: PX4 mode - string, timeout (seconds) - int
-    def set_mode(self, mode, timeout):
+    def set_mode(self, mode):
         self.get_logger().info("setting FCU mode: {0}".format(mode))
-        self.desired_state = mode
-        old_mode = self.drone_state.mode
-        loop_freq = 1  # Hz
-        loop_rate = self.create_rate(loop_freq)
-        mode_set = False
-        for i in range(timeout * loop_freq):
-            if self.drone_state.mode == mode:
-                mode_set = True
-                break
-            else:
-                try:
-                    self.set_mode_req.base_mode = 0
-                    self.set_mode_req.custom_mode = mode
-                    self.set_mode_srv.call_async(self.set_mode_req)  # 0 is custom mode
-                    if not future.result().mode_sent:
-                        self.get_logger().info("failed to send mode command")
-                    if self.drone_state.mode == mode:
-                        mode_set = True
-                        break
-                except Exception as e:
-                    self.get_logger().info(e)
-            try:
-                loop_rate.sleep()
-            except Exception as e:
-                self.get_logger().info(e)
-    
+        self.set_mode_req.base_mode = 0
+        self.set_mode_req.custom_mode = mode
+        future = self.set_mode_srv.call_async(self.set_mode_req)  # 0 is custom mode
+        while future.result() == None:
+            rclpy.spin_once(self)
+        if not future.result().mode_sent:
+            raise Exception("failed to send mode command")
+            
     def set_param(self, param_value):
         self.param_set_req.parameters = [param_value]
         self.param_set_srv.call_async(self.param_set_req)
@@ -262,7 +244,7 @@ class MAV2(Node):
         self.set_param(speed_param_value)
 
         self.__arm()
-        self.set_mode("AUTO.TAKEOFF", 2)
+        self.set_mode("AUTO.TAKEOFF")
         
         #safety measures: locks program while taking off
         if safety_on:
@@ -303,7 +285,7 @@ class MAV2(Node):
         land_speed_param_value= Parameter(name= 'MPC_LAND_SPEED', value=ParameterValue(double_value= speed, type=ParameterType.PARAMETER_DOUBLE))
         self.set_param(land_speed_param_value)
 
-        self.set_mode('AUTO.LAND',2)
+        self.set_mode('AUTO.LAND')
 
     ########## Arm #######
 
@@ -335,4 +317,3 @@ if __name__ == '__main__':
     mav = MAV2()
     mav.takeoff(5)
     mav.land()
-    #rclpy.spin(mav)

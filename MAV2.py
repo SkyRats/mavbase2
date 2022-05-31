@@ -15,12 +15,14 @@ from std_msgs.msg import String
 from rclpy.node import Node
 from rclpy.action import ActionServer, ActionClient
 from rclpy import qos
+from action_py.setPosition_action_client import SetPositionActionClient
+from action_py.setPosition_action_server import SetPositionActionServer
 import numpy as np
 import math
 import time
 import sys
 
-from mavbase2.action import Takeoff
+from action_interface import SetPosition
 
 
 TOL = 0.3
@@ -64,7 +66,11 @@ class MAV2(Node):
 
         self.param_set_srv = self.create_client(SetParameters,'/mavros/param/set_parameters')
         
-
+        ############## Action Server ##################
+        self.setPosition_action_server = SetPositionActionServer(self)
+        
+        ############# Action Clients ###################
+        self._setposition_action_client = SetPositionActionClient()
         '''
         ############## Action Servers ##################
         self._action_server = ActionServer(
@@ -233,6 +239,22 @@ class MAV2(Node):
        rclpy.spin_until_future_complete(self, future)
 
     '''
+    def __setPosition(self, x, y, z):
+        self.set_mode("OFFBOARD")
+        position_goal_msg = SetPosition.Goal()
+        position_goal_msg.position_request = float[x, y, z]
+
+        self._setposition_action_client.wait_for_server()
+
+        self._send_setposition_future = self._setposition_action_client.send_goal_async(position_goal_msg, feedback_callback=self.takeoff_feedback_callback)
+        self._send_setposition_future.add_done_callback(self.setposition_response_callback)
+        return self._send_setposition_future
+   
+    def setPosition(self, x, y, z):
+       future = self.__setPosition(x,y,z)
+       rclpy.spin_until_future_complete(self, future)
+        
+    
     def takeoff(self, height, speed=1.5, safety_on=True):
         height = float(height)
 

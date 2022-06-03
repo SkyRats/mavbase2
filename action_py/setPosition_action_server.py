@@ -4,7 +4,7 @@ import rclpy
 from rclpy.action import ActionServer
 from rclpy.node import Node
 
-from action_interface import SetPosition
+from mavbase2.action import SetPosition
 TOL = 0.3
 
 class SetPositionActionServer(Node):

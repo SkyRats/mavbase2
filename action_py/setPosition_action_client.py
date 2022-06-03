@@ -2,7 +2,7 @@ import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
 
-from action_interface import SetPosition
+from mavbase2.action import SetPosition
 
 
 class SetPositionActionClient(Node):

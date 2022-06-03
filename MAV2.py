@@ -1,8 +1,9 @@
+#!/usr/bin/env python3
+
 #from asyncio.windows_events import NULL
 from tkinter import SEL
 from turtle import position
 import rclpy
-import mavros_msgs
 from mavros_msgs import srv
 from mavros_msgs.srv import SetMode, CommandBool, CommandTOL
 from rcl_interfaces.msg import ParameterType, Parameter, ParameterValue
@@ -22,8 +23,7 @@ import math
 import time
 import sys
 
-from action_interface import SetPosition
-
+from mavbase2.action import SetPosition
 
 TOL = 0.3
 DEBUG = False
@@ -67,7 +67,7 @@ class MAV2(Node):
         self.param_set_srv = self.create_client(SetParameters,'/mavros/param/set_parameters')
         
         ############## Action Server ##################
-        self.setPosition_action_server = SetPositionActionServer(self)
+        self.setPosition_action_server = SetPositionActionServer()
         
         ############# Action Clients ###################
         self._setposition_action_client = SetPositionActionClient()

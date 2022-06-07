@@ -23,7 +23,7 @@ import math
 import time
 import sys
 
-from mavbase2.action import SetPosition
+from mavbase2.action import SetPosition 
 
 TOL = 0.3
 DEBUG = False
@@ -242,11 +242,11 @@ class MAV2(Node):
     def __setPosition(self, x, y, z):
         self.set_mode("OFFBOARD")
         position_goal_msg = SetPosition.Goal()
-        position_goal_msg.position_request = float[x, y, z]
+        position_goal_msg.position_request = [float (x), float (y), float (z)]
+        
+        #self._setposition_action_client._action_client.wait_for_server()
 
-        self._setposition_action_client.wait_for_server()
-
-        self._send_setposition_future = self._setposition_action_client.send_goal_async(position_goal_msg, feedback_callback=self.takeoff_feedback_callback)
+        self._send_setposition_future = self._setposition_action_client._action_client.send_goal_async(position_goal_msg, feedback_callback=self.takeoff_feedback_callback)
         self._send_setposition_future.add_done_callback(self.setposition_response_callback)
         return self._send_setposition_future
    
@@ -338,4 +338,6 @@ if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
     mav.takeoff(5)
+    mav.setPosition(2, 3, 2)
     mav.land()
+    

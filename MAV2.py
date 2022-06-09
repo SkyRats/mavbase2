@@ -210,7 +210,7 @@ class MAV2(Node):
     
     ###Set mode: PX4 mode - string, timeout (seconds) - int
     def set_mode(self, mode):
-        self.get_logger().info("setting FCU mode: {0}".format(mode))
+        #self.get_logger().info("setting FCU mode: {0}".format(mode))
         self.set_mode_req.base_mode = 0
         self.set_mode_req.custom_mode = mode
         future = self.set_mode_srv.call_async(self.set_mode_req)  # 0 is custom mode
@@ -238,7 +238,7 @@ class MAV2(Node):
        future = self.__takeoff(height)
        rclpy.spin_until_future_complete(self, future)
 
-    '''
+    
     def __setPosition(self, x, y, z):
         self.set_mode("OFFBOARD")
         position_goal_msg = SetPosition.Goal()
@@ -246,14 +246,14 @@ class MAV2(Node):
         
         #self._setposition_action_client._action_client.wait_for_server()
 
-        self._send_setposition_future = self._setposition_action_client._action_client.send_goal_async(position_goal_msg, feedback_callback=self.takeoff_feedback_callback)
+        self._send_setposition_future = self._setposition_action_client._action_client.send_goal_async(position_goal_msg, feedback_callback=self.action_client.feedback_callback)
         self._send_setposition_future.add_done_callback(self.setposition_response_callback)
         return self._send_setposition_future
    
     def setPosition(self, x, y, z):
        future = self.__setPosition(x,y,z)
        rclpy.spin_until_future_complete(self, future)
-        
+        '''
     
     def takeoff(self, height, speed=1.5, safety_on=True):
         height = float(height)
@@ -283,17 +283,27 @@ class MAV2(Node):
         self.goal_pose.pose.position.z = z
         self.local_position_pub.publish(self.goal_pose)
         self.rate.sleep()
-        
+      """  
     def set_vel(self, x, y, z, roll = 0, pitch = 0, yaw = 0):
-        self.goal_vel.twist.linear.x = x 
-        self.goal_vel.twist.linear.y = y
-        self.goal_vel.twist.linear.z = z 
+        while self.drone_state.mode != "OFFBOARD":
+            self.goal_vel.twist.linear.x = float(x)
+            self.goal_vel.twist.linear.y = float(y)
+            self.goal_vel.twist.linear.z = float(z)
 
-        self.goal_vel.twist.angular.x = roll
-        self.goal_vel.twist.angular.y = pitch
-        self.goal_vel.twist.angular.z = yaw
+            self.goal_vel.twist.angular.x = float(roll)
+            self.goal_vel.twist.angular.y = float(pitch)
+            self.goal_vel.twist.angular.z = float(yaw)
+            self.velocity_pub.publish(self.goal_vel)  
+            self.set_mode("OFFBOARD")
+
+        self.goal_vel.twist.linear.x = float(x)
+        self.goal_vel.twist.linear.y = float(y)
+        self.goal_vel.twist.linear.z = float(z)
+
+        self.goal_vel.twist.angular.x = float(roll)
+        self.goal_vel.twist.angular.y = float(pitch)
+        self.goal_vel.twist.angular.z = float(yaw)
         self.velocity_pub.publish(self.goal_vel)    
-    """
 
 
     def land(self, auto_disarm=True, speed=0.7):
@@ -337,7 +347,16 @@ class MAV2(Node):
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
-    mav.takeoff(5)
-    mav.setPosition(2, 3, 2)
-    mav.land()
+    #mav.takeoff(5)
+    
+
+    #action_client = SetPositionActionClient()
+    
+    
+    #action_client.send_goal([10.0, 10.0, 3.0])
+
+    #rclpy.spin(action_client)
+    #for i in range(1000):
+    #    mav.set_vel(-1, -1, 0)
+
     

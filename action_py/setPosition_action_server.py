@@ -11,11 +11,7 @@ class SetPositionActionServer(Node):
 
     def __init__(self):
         super().__init__('setPosition_action_server')
-        self._action_server = ActionServer(
-            self,
-            SetPosition,
-            'setPosition',
-            self.execute_callback)
+        self._action_server = ActionServer(self, SetPosition, 'setPosition', self.execute_callback)
 
     
     # Need to get the initial position from MAV2 #

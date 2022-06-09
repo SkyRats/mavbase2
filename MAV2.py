@@ -274,16 +274,21 @@ class MAV2(Node):
                 rclpy.spin_once(self)
             while self.drone_state.mode == "AUTO.TAKEOFF":
                 rclpy.spin_once(self)
-
-    """
+    
     ####### Goal Position and Velocity #########
     def set_position(self, x, y, z):
-        self.goal_pose.pose.position.x = x
-        self.goal_pose.pose.position.y = y
-        self.goal_pose.pose.position.z = z
+        while self.drone_state.mode != "OFFBOARD":
+            self.goal_pose.pose.position.x = float(x)
+            self.goal_pose.pose.position.y = float(y)
+            self.goal_pose.pose.position.z = float(z)
+            self.local_position_pub.publish(self.goal_pose)
+            self.set_mode("OFFBOARD")
+
+        self.goal_pose.pose.position.x = float(x)
+        self.goal_pose.pose.position.y = float(y)
+        self.goal_pose.pose.position.z = float(z)
         self.local_position_pub.publish(self.goal_pose)
-        self.rate.sleep()
-      """  
+
     def set_vel(self, x, y, z, roll = 0, pitch = 0, yaw = 0):
         while self.drone_state.mode != "OFFBOARD":
             self.goal_vel.twist.linear.x = float(x)
@@ -347,16 +352,24 @@ class MAV2(Node):
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
-    #mav.takeoff(5)
-    
+    mav.takeoff(5)
+    goal_x = 20
+    goal_y = 40
+    actual_x = mav.drone_pose.pose.position.x
+    actual_y = mav.drone_pose.pose.position.y
+    while(np.sqrt((goal_x - actual_x  )**2 + (goal_y - actual_y)**2)) > 0.3:
+        
+        mav.set_position(goal_x, goal_y, 40)
+        actual_x = mav.drone_pose.pose.position.x
+        actual_y = mav.drone_pose.pose.position.y
+        mav.rate.sleep()
 
-    #action_client = SetPositionActionClient()
-    
-    
-    #action_client.send_goal([10.0, 10.0, 3.0])
+    print(mav.drone_pose.pose.position.x)
+    print(mav.drone_pose.pose.position.y)
 
-    #rclpy.spin(action_client)
-    #for i in range(1000):
-    #    mav.set_vel(-1, -1, 0)
+
+
+   
+   
 
     

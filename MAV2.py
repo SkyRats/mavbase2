@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 
-#from asyncio.windows_events import NULL
 from tkinter import SEL
 from turtle import position
 import rclpy
 from mavros_msgs import srv
-from mavros_msgs.srv import SetMode, CommandBool, CommandTOL
+from mavros_msgs.srv import SetMode, CommandBool
 from rcl_interfaces.msg import ParameterType, Parameter, ParameterValue
 from rcl_interfaces.srv import SetParameters
 from mavros_msgs.msg import State, ExtendedState, PositionTarget
@@ -14,30 +13,15 @@ from geographic_msgs.msg import GeoPoseStamped
 from sensor_msgs.msg import BatteryState, NavSatFix
 from std_msgs.msg import String
 from rclpy.node import Node
-from rclpy.action import ActionServer, ActionClient
 from rclpy import qos
 from action_py.setPosition_action_client import SetPositionActionClient
 from action_py.setPosition_action_server import SetPositionActionServer
 import numpy as np
-import math
-import time
 import sys
 
 from mavbase2.action import SetPosition 
 
-TOL = 0.3
 DEBUG = False
-#mavros_local_position_pub: '/mavros/setpoint_position/local'
-#mavros_velocity_pub : '/mavros/setpoint_velocity/cmd_vel'
-#mavros_local_atual :  '/mavros/local_position/pose'
-#mavros_state_sub :    '/mavros/state'
-#mavros_arm :          '/mavros/cmd/arming'
-#mavros_set_mode :     '/mavros/set_mode'
-#mavros_battery_sub :  '/mavros/battery'
-#extended_state_sub:   '/mavros/extended_state'
-#mavros_global_position_sub: '/mavros/global_position/global'
-#mavros_pose_target_sub:  '/mavros/setpoint_raw/local'
-#mavros_set_global_pub: '/mavros/setpoint_position/global'
 
 class MAV2(Node):
 
@@ -71,17 +55,6 @@ class MAV2(Node):
         
         ############# Action Clients ###################
         self._setposition_action_client = SetPositionActionClient()
-        '''
-        ############## Action Servers ##################
-        self._action_server = ActionServer(
-            self,
-            setPosition,
-            'setposition',
-            self.setposition_server_callback)
-
-        ############# Action Clients ###################
-        self._seetposition_action_client = ActionClient(self, setPosition, 'setposition')
-        '''
 
         ############### Publishers ##############
 
@@ -127,86 +100,7 @@ class MAV2(Node):
         self.drone_pose = data
     
     def global_callback(self, global_data):
-        self.global_pose = global_data
-
-    '''
-    def setposition_server_callback(self, height):
-        self.get_logger().info("...")
-
-        feedback_msg = setPosition.Feedback()
-        velocity = 1 # velocidade media
-
-        self.set_mode("OFFBOARD")
-
-        if not self.drone_state.armed:
-            self.get_logger().warn("ARMING DRONE")
-            fb = self.arm(True)
-            while not fb.success:
-                if DEBUG:
-                    self.get_logger().warn("ARMING DRONE {}".format(fb))
-                fb = self.arm(True)
-                self.rate.sleep()
-            self.get_logger().info("DRONE ARMED")
-        else:
-            self.get_logger().info("DRONE ALREADY ARMED")
-
-        self.rate.sleep()
-        self.get_logger().info('Executing takeoff methods...')
-
-        p = self.drone_pose.pose.position.z
-        time = 0
-        #while abs(self.drone_pose.pose.position.z - height) >= TOL and not rclpy.is_shutdown():
-        while abs(self.takeoff_feedback - height) >= TOL and not rclpy.is_shutdown():
-            time += 1/60.0 #sec - init_time
-
-            if p < height:
-                p = ((-2 * (velocity**3) * (time**3)) / height**2) + ((3*(time**2) * (velocity**2))/height)
-                self.drone_pose.pose.position.z = p
-            else:
-                self.drone_pose.pose.position.z = height
-
-        actualHeight = self.drone_pose.pose.position.z
-
-        for i in range(1, height.request.height_request):
-            feedback_msg.partial_height = actualHeight
-            self.get_logger().info('setPosition feedback: {0}'.format(feedback_msg.partial_height))
-            height.publish_feedback(feedback_msg)
-            time.sleep(1)
-
-        height.succeed()
-
-        result = setPosition.Result()
-
-        result.height_result = feedback_msg.partial_height
-
-        return result
-
-
-    # Takeoff server call response
-    def setposition_response_callback(self, future):
-        takeoff_handle = future.result()
-        if not takeoff_handle.accepted:
-            self.get_logger().info("Set position command DENIED")
-            return
-
-        self.get_logger().info("Set position command ACCEPTED")
-
-        self._get_result_future = takeoff_handle.get_result_async()
-        self._get_result_future.add_done_callback(self.get_takeoff_result_callback)
-
-    # Takeoff height after takeoff method completion
-    def get_setposition_result_callback(self, future):
-        result = future.result().result
-        self.get_logger().info("Takeoff result: {0}".format(result.height_result))
-        rclpy.shutdown()
-
-    # Takeoff height durind ascension
-    def setposition_feedback_callback(self, feedback_msg):
-        self._setposition_feedback = feedback_msg.feedback
-        self.get_logger().info("Received set position feedback: {0}".format(self._setposition_feedback.partial_height))
-
-    '''
-    
+        self.global_pose = global_data    
     
     ###Set mode: PX4 mode - string, timeout (seconds) - int
     def set_mode(self, mode):
@@ -223,38 +117,6 @@ class MAV2(Node):
         self.param_set_req.parameters = [param_value]
         self.param_set_srv.call_async(self.param_set_req)
 
-    '''
-    def __setPosition (self, x, y, z):
-       height_goal_msg = Takeoff.Goal()
-       height_goal_msg.height_request = float(height)
-
-       self._setposition_action_client.wait_for_server()
-
-       self._send_setposition_future = self._takeoff_action_client.send_goal_async(height_goal_msg, feedback_callback=self.takeoff_feedback_callback)
-       self._send_setposition_future.add_done_callback(self.setposition_response_callback)
-       return self._send_setposition_future
-
-    def setPosition(self, x, y, z):
-       future = self.__takeoff(height)
-       rclpy.spin_until_future_complete(self, future)
-
-    
-    def __setPosition(self, x, y, z):
-        self.set_mode("OFFBOARD")
-        position_goal_msg = SetPosition.Goal()
-        position_goal_msg.position_request = [float (x), float (y), float (z)]
-        
-        #self._setposition_action_client._action_client.wait_for_server()
-
-        self._send_setposition_future = self._setposition_action_client._action_client.send_goal_async(position_goal_msg, feedback_callback=self.action_client.feedback_callback)
-        self._send_setposition_future.add_done_callback(self.setposition_response_callback)
-        return self._send_setposition_future
-   
-    def setPosition(self, x, y, z):
-       future = self.__setPosition(x,y,z)
-       rclpy.spin_until_future_complete(self, future)
-        '''
-    
     def takeoff(self, height, speed=1.5, safety_on=True):
         height = float(height)
 
@@ -264,7 +126,10 @@ class MAV2(Node):
         speed = float(speed)
         speed_param_value = Parameter(name= 'MPC_TKO_SPEED', value=ParameterValue(double_value=speed, type=ParameterType.PARAMETER_DOUBLE))
         self.set_param(speed_param_value)
-
+        rclpy.spin_once(self)
+        if self.drone_state.armed:
+            self.get_logger().error("Drone already armed! Takeoff cancelled")
+            return
         self.__arm()
         self.set_mode("AUTO.TAKEOFF")
         
@@ -290,7 +155,7 @@ class MAV2(Node):
         self.local_position_pub.publish(self.goal_pose)
     
     def go_to_local(self, goal_x, goal_y, goal_z, TOL=0.2):
-        self.get_logger().info("going towards local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + ")")
+        self.get_logger().info("Going towards local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + ")")
         current_x = mav.drone_pose.pose.position.x
         current_y = mav.drone_pose.pose.position.y
         current_z = mav.drone_pose.pose.position.z
@@ -300,7 +165,7 @@ class MAV2(Node):
             current_y = mav.drone_pose.pose.position.y
             current_z = mav.drone_pose.pose.position.z
             self.set_position(goal_x, goal_y, goal_z)
-        self.get_logger().info("arrived at local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + ")")
+        self.get_logger().info("Arrived at local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + ")")
 
     def set_vel(self, x, y, z, roll = 0, pitch = 0, yaw = 0):
         while self.drone_state.mode != "OFFBOARD":
@@ -365,7 +230,7 @@ class MAV2(Node):
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
-    #mav.takeoff(5)
+    mav.takeoff(5)
     mav.go_to_local(-10,5,2,0.1)
 
 

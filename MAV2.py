@@ -288,6 +288,19 @@ class MAV2(Node):
         self.goal_pose.pose.position.y = float(y)
         self.goal_pose.pose.position.z = float(z)
         self.local_position_pub.publish(self.goal_pose)
+    
+    def go_to_local(self, goal_x, goal_y, goal_z, TOL=0.2):
+        self.get_logger().info("going towards local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + ")")
+        current_x = mav.drone_pose.pose.position.x
+        current_y = mav.drone_pose.pose.position.y
+        current_z = mav.drone_pose.pose.position.z
+        while(np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2)) > TOL:
+            rclpy.spin_once(self)
+            current_x = mav.drone_pose.pose.position.x
+            current_y = mav.drone_pose.pose.position.y
+            current_z = mav.drone_pose.pose.position.z
+            self.set_position(goal_x, goal_y, goal_z)
+        self.get_logger().info("arrived at local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + ")")
 
     def set_vel(self, x, y, z, roll = 0, pitch = 0, yaw = 0):
         while self.drone_state.mode != "OFFBOARD":
@@ -352,20 +365,8 @@ class MAV2(Node):
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
-    mav.takeoff(5)
-    goal_x = 20
-    goal_y = 40
-    actual_x = mav.drone_pose.pose.position.x
-    actual_y = mav.drone_pose.pose.position.y
-    while(np.sqrt((goal_x - actual_x  )**2 + (goal_y - actual_y)**2)) > 0.3:
-        
-        mav.set_position(goal_x, goal_y, 40)
-        actual_x = mav.drone_pose.pose.position.x
-        actual_y = mav.drone_pose.pose.position.y
-        mav.rate.sleep()
-
-    print(mav.drone_pose.pose.position.x)
-    print(mav.drone_pose.pose.position.y)
+    #mav.takeoff(5)
+    mav.go_to_local(-10,5,2,0.1)
 
 
 

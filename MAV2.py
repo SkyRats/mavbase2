@@ -10,7 +10,7 @@ from rcl_interfaces.srv import SetParameters
 from mavros_msgs.msg import State, ExtendedState, PositionTarget
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from geographic_msgs.msg import GeoPoseStamped
-from sensor_msgs.msg import BatteryState, NavSatFix
+from sensor_msgs.msg import BatteryState, NavSatFix, Image
 from std_msgs.msg import String
 from rclpy.node import Node
 from rclpy import qos
@@ -18,6 +18,7 @@ from action_py.setPosition_action_client import SetPositionActionClient
 from action_py.setPosition_action_server import SetPositionActionServer
 import numpy as np
 import sys
+from cv_bridge import CvBridge 
 
 from mavbase2.action import SetPosition 
 
@@ -41,6 +42,8 @@ class MAV2(Node):
         self.battery = BatteryState()
         self.global_pose = NavSatFix()
         self.gps_target = GeoPoseStamped()
+        self.cam = Image()
+        self.bridge_object = CvBridge()
 
         ############# Services ##################
 
@@ -69,6 +72,8 @@ class MAV2(Node):
         self.state_sub =  self.create_subscription(State, '/mavros/state', self.state_callback, qos.qos_profile_sensor_data)
         self.battery_sub =  self.create_subscription(BatteryState, '/mavros/battery', self.battery_callback, qos.qos_profile_sensor_data)
         self.global_position_sub =  self.create_subscription(NavSatFix,'/mavros/global_position/global' , self.global_callback, qos.qos_profile_sensor_data)
+        self.cam_sub = self.create_subscription(Image, '/camera/image_raw', self.cam_callback, qos.qos_profile_sensor_data)
+
 
         service_timeout = 15
         while not self.set_mode_srv.wait_for_service(timeout_sec=service_timeout):
@@ -101,6 +106,9 @@ class MAV2(Node):
     
     def global_callback(self, global_data):
         self.global_pose = global_data    
+
+    def cam_callback(self, cam_data):
+        self.cam = self.bridge_object.imgmsg_to_cv2(cam_data,"bgr8")
     
     ###Set mode: PX4 mode - string, timeout (seconds) - int
     def set_mode(self, mode):

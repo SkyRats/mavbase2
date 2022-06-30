@@ -44,6 +44,7 @@ class MAV2(Node):
         self.gps_target = GeoPoseStamped()
         self.cam = Image()
         self.bridge_object = CvBridge()
+        self.camera_topic = ""
 
         ############# Services ##################
 
@@ -72,7 +73,7 @@ class MAV2(Node):
         self.state_sub =  self.create_subscription(State, '/mavros/state', self.state_callback, qos.qos_profile_sensor_data)
         self.battery_sub =  self.create_subscription(BatteryState, '/mavros/battery', self.battery_callback, qos.qos_profile_sensor_data)
         self.global_position_sub =  self.create_subscription(NavSatFix,'/mavros/global_position/global' , self.global_callback, qos.qos_profile_sensor_data)
-        self.cam_sub = self.create_subscription(Image, '/camera/image_raw', self.cam_callback, qos.qos_profile_sensor_data)
+        self.cam_sub = self.create_subscription(Image, self.camera_topic, self.cam_callback, qos.qos_profile_sensor_data)
 
 
         service_timeout = 15

@@ -19,6 +19,7 @@ from action_py.setPosition_action_server import SetPositionActionServer
 import numpy as np
 import sys
 from cv_bridge import CvBridge 
+from tf_transformations import quaternion_from_euler, euler_from_quaternion
 
 from mavbase2.action import SetPosition 
 
@@ -44,7 +45,7 @@ class MAV2(Node):
         self.gps_target = GeoPoseStamped()
         self.cam = Image()
         self.bridge_object = CvBridge()
-        self.camera_topic = ""
+        self.camera_topic = "/camera/image_raw"
 
         ############# Services ##################
 
@@ -150,40 +151,47 @@ class MAV2(Node):
                 rclpy.spin_once(self)
     
     ####### Goal Position and Velocity #########
-    def set_position(self, x, y, z):
-        while self.drone_state.mode != "OFFBOARD":
-            self.goal_pose.pose.position.x = float(x)
-            self.goal_pose.pose.position.y = float(y)
-            self.goal_pose.pose.position.z = float(z)
-            self.local_position_pub.publish(self.goal_pose)
-            self.set_mode("OFFBOARD")
-
+    def set_position(self, x, y, z, yaw = None):
         self.goal_pose.pose.position.x = float(x)
         self.goal_pose.pose.position.y = float(y)
         self.goal_pose.pose.position.z = float(z)
+
+        if yaw == None:
+            self.goal_pose.pose.orientation = self.drone_pose.pose.orientation
+        else:
+            [self.goal_pose.pose.orientation.x, 
+            self.goal_pose.pose.orientation.y, 
+            self.goal_pose.pose.orientation.z,
+            self.goal_pose.pose.orientation.w] = quaternion_from_euler(0,0,yaw) #roll,pitch,yaw
+
+        while self.drone_state.mode != "OFFBOARD":
+            self.local_position_pub.publish(self.goal_pose)
+            self.set_mode("OFFBOARD")
         self.local_position_pub.publish(self.goal_pose)
     
-    def go_to_local(self, goal_x, goal_y, goal_z, TOL=0.2):
-        self.get_logger().info("Going towards local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + ")")
+    def go_to_local(self, goal_x, goal_y, goal_z, yaw = None, TOL=0.2):
+        self.get_logger().info("Going towards local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + "), with a yaw angle of: " + str(yaw))
         current_x = self.drone_pose.pose.position.x
         current_y = self.drone_pose.pose.position.y
         current_z = self.drone_pose.pose.position.z
-        while(np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2)) > TOL:
+        [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
+        if yaw == None:
+            yaw = current_yaw
+        while(np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2) + (current_yaw - yaw)**2) > TOL:
             rclpy.spin_once(self)
             current_x = self.drone_pose.pose.position.x
             current_y = self.drone_pose.pose.position.y
             current_z = self.drone_pose.pose.position.z
-            self.set_position(goal_x, goal_y, goal_z)
-        self.get_logger().info("Arrived at local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + ")")
+            [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
+            self.set_position(goal_x, goal_y, goal_z, yaw)
+        self.get_logger().info("Arrived at requested position")
 
-    def set_vel(self, x, y, z, roll = 0, pitch = 0, yaw = 0):
+    def set_vel(self, x, y, z, yaw = 0):
         while self.drone_state.mode != "OFFBOARD":
             self.goal_vel.twist.linear.x = float(x)
             self.goal_vel.twist.linear.y = float(y)
             self.goal_vel.twist.linear.z = float(z)
 
-            self.goal_vel.twist.angular.x = float(roll)
-            self.goal_vel.twist.angular.y = float(pitch)
             self.goal_vel.twist.angular.z = float(yaw)
             self.velocity_pub.publish(self.goal_vel)  
             self.set_mode("OFFBOARD")
@@ -240,7 +248,7 @@ if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
     mav.takeoff(5)
-    mav.go_to_local(-10,5,2,0.1)
+    mav.go_to_local(0,0,3, yaw = 0, TOL = 0.1)
 
 
 

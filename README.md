@@ -1,6 +1,10 @@
 # mavbase2
 Repository for basic mav functions implemented in ROS 2
 
+## Dependencies
+- ```sudo apt install ros-$ROS_DISTRO-tf-transformations```
+- ```pip3 install transforms3d```
+
 ## Launch options
 This repository also contains launch files used to connect MAVROS in different situations. Here are some examples on how to use them:
 ### Simulation in the loop (SITL)

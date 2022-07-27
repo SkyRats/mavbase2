@@ -200,8 +200,6 @@ class MAV2(Node):
         self.goal_vel.twist.linear.y = float(y)
         self.goal_vel.twist.linear.z = float(z)
 
-        self.goal_vel.twist.angular.x = float(roll)
-        self.goal_vel.twist.angular.y = float(pitch)
         self.goal_vel.twist.angular.z = float(yaw)
         self.velocity_pub.publish(self.goal_vel)    
 
@@ -248,7 +246,7 @@ if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
     mav.takeoff(5)
-    mav.go_to_local(0,0,3, yaw = 0, TOL = 0.1)
+    mav.go_to_local(-10,5,2, yaw = 3.14, TOL = 0.1)
 
 
 

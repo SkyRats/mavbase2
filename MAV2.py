@@ -21,7 +21,7 @@ import numpy as np
 import math
 import sys
 from cv_bridge import CvBridge 
-#from tf_transformations import quaternion_from_euler, euler_from_quaternion
+from tf_transformations import quaternion_from_euler, euler_from_quaternion
 
 from mavbase2.action import SetPosition 
 
@@ -44,9 +44,8 @@ class MAV2(Node):
         self.goal_vel = TwistStamped()
         self.drone_state = State()
         self.battery = BatteryState()
-        self.global_pose = GeoPoseStamped()
+        self.global_pose = NavSatFix()
         self.gps_target = GeoPoseStamped()
-        self.gps_target2 = NavSatFix()
         self.cam = Image()
         self.bridge_object = CvBridge()
         self.camera_topic = "/camera/image_raw"
@@ -71,7 +70,6 @@ class MAV2(Node):
         self.velocity_pub = self.create_publisher(TwistStamped,  '/mavros/setpoint_velocity/cmd_vel', 5)
         self.target_pub = self.create_publisher(PositionTarget, '/mavros/setpoint_raw/local', 5)
         self.global_position_pub = self.create_publisher(GeoPoseStamped, '/mavros/setpoint_position/global', 20)
-        self.global_position_pub2 = self.create_publisher(NavSatFix, '/mavros/global_position/global', 20)
 
         ########## Subscribers ##################
 
@@ -198,23 +196,23 @@ class MAV2(Node):
             self.set_position(goal_x, goal_y, goal_z, yaw)
         self.get_logger().info("Arrived at requested position")
 
-    def go_to_global(self, lat, lon):
+    def go_to_global(self, lat, lon, yaw=0):
         self.get_logger().info("Going to latitude " + str(lat) + ", longitude " + str(lon))
         self.gps_target.pose.position.latitude = lat
         self.gps_target.pose.position.longitude = lon
-        self.gps_target2.latitude = lat
-        self.gps_target2.longitude = lon
+        self.gps_target.pose.position.altitude = self.drone_pose.pose.position.z
         time_stamp = Clock().now()
         self.gps_target.header.stamp = time_stamp.to_msg()
-        self.gps_target2.header.stamp = time_stamp.to_msg()
         goal = [lat, lon]
         actual_global_pose = [self.global_pose.latitude, self.global_pose.longitude]
         dist = self.global_dist(goal, actual_global_pose)
         self.get_logger().info("Distance: " + str(dist))
         while dist >= GLOBAL_TOL:
-            #self.global_position_pub.publish(self.gps_target)
-            self.global_position_pub2.publish(self.gps_target2)
-            actual_global_pose = [self.global_pose.pose.position.latitude, self.global_pose.pose.position.longitude]
+            while self.drone_state.mode != "OFFBOARD":
+                self.local_position_pub.publish(self.goal_pose)
+                self.set_mode("OFFBOARD")
+            self.global_position_pub.publish(self.gps_target)
+            actual_global_pose = [self.global_pose.latitude, self.global_pose.longitude]
             dist = self.global_dist(goal, actual_global_pose)
             self.get_logger().info("Distance: " + str(dist))
         self.get_logger().info("Arrived at latitude: " + str(self.global_pose.pose.position.latitude)+ " longitude: " + str(self.global_pose.pose.position.longitude))
@@ -298,8 +296,8 @@ if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
     mav.takeoff(5)
-    #mav.go_to_local(-10,5,2, yaw = 3.14, TOL = 0.1)
-    mav.go_to_global(mav.global_pose.pose.position.latitude + 0.0005, mav.global_pose.pose.position.longitude + 0.00005)
+    mav.go_to_local(0, 0, 5, TOL = 0.1)
+    mav.go_to_global(mav.global_pose.latitude + 0.00005, mav.global_pose.longitude + 0.000005)
 
    
    

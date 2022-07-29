@@ -2,6 +2,8 @@
 Repository for basic mav functions implemented in ROS 2
 
 ## Dependencies
+- ROS2 running with Mavros (Recommended installation: [skyrats-workplace](https://github.com/SkyRats/skyrats-workplace/tree/ros2))
+- ```sudo apt install python3-opencv```
 - ```sudo apt install ros-$ROS_DISTRO-tf-transformations```
 - ```pip3 install transforms3d```
 
@@ -25,3 +27,9 @@ For telemetry connection with the FCU, run the following:
 For usb connection with the FCU, run the following:
 
 ```ros2 launch mavbase2 px4_usb.launch.py```
+## Importing MAV2.py from another package
+If you followed the default installation through [skyrats-workplace](https://github.com/SkyRats/skyrats-workplace/tree/ros2), just add the following lines to your python code:
+``` python
+sys.path.insert(0,'/home/' + os.environ["USER"] + '/skyrats_ws2/src/mavbase2')
+from MAV2 import MAV2
+```

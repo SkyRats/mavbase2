@@ -14,9 +14,11 @@ from sensor_msgs.msg import BatteryState, NavSatFix, Image
 from std_msgs.msg import String
 from rclpy.node import Node
 from rclpy import qos
+from rclpy.clock import Clock
 from action_py.setPosition_action_client import SetPositionActionClient
 from action_py.setPosition_action_server import SetPositionActionServer
 import numpy as np
+import math
 import sys
 from cv_bridge import CvBridge 
 from tf_transformations import quaternion_from_euler, euler_from_quaternion
@@ -24,6 +26,7 @@ from tf_transformations import quaternion_from_euler, euler_from_quaternion
 from mavbase2.action import SetPosition 
 
 DEBUG = False
+GLOBAL_TOL = 0.000001
 
 class MAV2(Node):
 
@@ -112,6 +115,13 @@ class MAV2(Node):
     def cam_callback(self, cam_data):
         self.cam = self.bridge_object.imgmsg_to_cv2(cam_data,"bgr8")
     
+    def verify_battery(self):
+        percentage = self.battery.percentage
+        while percentage == 0:
+            self.get_logger().info("Battery percentage is zero: " + str(percentage))
+        while percentage != 0:
+            self.get_logger().info("Battery percentage is not zero: " + str(percentage))
+
     ###Set mode: PX4 mode - string, timeout (seconds) - int
     def set_mode(self, mode):
         #self.get_logger().info("setting FCU mode: {0}".format(mode))
@@ -186,6 +196,27 @@ class MAV2(Node):
             self.set_position(goal_x, goal_y, goal_z, yaw)
         self.get_logger().info("Arrived at requested position")
 
+    def go_to_global(self, lat, lon, yaw=0):
+        self.get_logger().info("Going to latitude " + str(lat) + ", longitude " + str(lon))
+        self.gps_target.pose.position.latitude = lat
+        self.gps_target.pose.position.longitude = lon
+        self.gps_target.pose.position.altitude = self.drone_pose.pose.position.z
+        time_stamp = Clock().now()
+        self.gps_target.header.stamp = time_stamp.to_msg()
+        goal = [lat, lon]
+        actual_global_pose = [self.global_pose.latitude, self.global_pose.longitude]
+        dist = self.global_dist(goal, actual_global_pose)
+        self.get_logger().info("Distance: " + str(dist))
+        while dist >= GLOBAL_TOL:
+            while self.drone_state.mode != "OFFBOARD":
+                self.local_position_pub.publish(self.goal_pose)
+                self.set_mode("OFFBOARD")
+            self.global_position_pub.publish(self.gps_target)
+            actual_global_pose = [self.global_pose.latitude, self.global_pose.longitude]
+            dist = self.global_dist(goal, actual_global_pose)
+            self.get_logger().info("Distance: " + str(dist))
+        self.get_logger().info("Arrived at latitude: " + str(self.global_pose.pose.position.latitude)+ " longitude: " + str(self.global_pose.pose.position.longitude))
+
     def set_vel(self, x, y, z, yaw = 0):
         while self.drone_state.mode != "OFFBOARD":
             self.goal_vel.twist.linear.x = float(x)
@@ -241,14 +272,32 @@ class MAV2(Node):
         #    self.land()
         #    self.arm_srv.call_async(self.arm_req)
 
+    ############ Additional functions #############
+    def global_dist(self, coord1 , coord2):  # distance from 2 gps coordinates using Haversine function
+        #coord1 = [lat, long]
+        lat1,lon1=coord1
+        lat2,lon2=coord2
+
+        R=6371000                               # radius of Earth in meters
+        phi_1=math.radians(lat1)
+        phi_2=math.radians(lat2)
+
+        delta_phi=math.radians(lat2-lat1)
+        delta_lambda=math.radians(lon2-lon1)
+
+        a=math.sin(delta_phi/2.0)**2+\
+        math.cos(phi_1)*math.cos(phi_2)*\
+        math.sin(delta_lambda/2.0)**2
+        c=2*math.atan2(math.sqrt(a),math.sqrt(1-a))
+        
+        return R*c                             # output distance in meters
 
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
     mav.takeoff(5)
-    mav.go_to_local(-10,5,2, yaw = 3.14, TOL = 0.1)
-
-
+    mav.go_to_local(0, 0, 5, TOL = 0.1)
+    mav.go_to_global(mav.global_pose.latitude + 0.00005, mav.global_pose.longitude + 0.000005)
 
    
    

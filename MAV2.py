@@ -14,6 +14,7 @@ from sensor_msgs.msg import BatteryState, NavSatFix, Image
 from std_msgs.msg import String
 from rclpy.node import Node
 from rclpy import qos
+from rclpy.clock import Clock
 from action_py.setPosition_action_client import SetPositionActionClient
 from action_py.setPosition_action_server import SetPositionActionServer
 import numpy as np
@@ -69,15 +70,15 @@ class MAV2(Node):
         self.local_position_pub = self.create_publisher(PoseStamped, '/mavros/setpoint_position/local', 20)
         self.velocity_pub = self.create_publisher(TwistStamped,  '/mavros/setpoint_velocity/cmd_vel', 5)
         self.target_pub = self.create_publisher(PositionTarget, '/mavros/setpoint_raw/local', 5)
-        self.global_position_pub = self.create_publisher(GeoPoseStamped, '/mavros/global_position/global', 20)
-        self.global_position_pub2 = self.create_publisher(NavSatFix, '/mavros/setpoint_position/global', 20)
+        self.global_position_pub = self.create_publisher(GeoPoseStamped, '/mavros/setpoint_position/global', 20)
+        self.global_position_pub2 = self.create_publisher(NavSatFix, '/mavros/global_position/global', 20)
 
         ########## Subscribers ##################
 
         self.local_atual = self.create_subscription(PoseStamped, '/mavros/local_position/pose', self.local_callback, qos.qos_profile_sensor_data)
         self.state_sub =  self.create_subscription(State, '/mavros/state', self.state_callback, qos.qos_profile_sensor_data)
         self.battery_sub =  self.create_subscription(BatteryState, '/mavros/battery', self.battery_callback, qos.qos_profile_sensor_data)
-        self.global_position_sub =  self.create_subscription(GeoPoseStamped,'/mavros/global_position/global' , self.global_callback, qos.qos_profile_sensor_data)
+        self.global_position_sub =  self.create_subscription(NavSatFix,'/mavros/global_position/global' , self.global_callback, qos.qos_profile_sensor_data)
         self.cam_sub = self.create_subscription(Image, self.camera_topic, self.cam_callback, qos.qos_profile_sensor_data)
 
 
@@ -201,14 +202,18 @@ class MAV2(Node):
         self.get_logger().info("Going to latitude " + str(lat) + ", longitude " + str(lon))
         self.gps_target.pose.position.latitude = lat
         self.gps_target.pose.position.longitude = lon
-        #self.gps_target2pose.position.latitude = lat
+        self.gps_target2.latitude = lat
+        self.gps_target2.longitude = lon
+        time_stamp = Clock().now()
+        self.gps_target.header.stamp = time_stamp.to_msg()
+        self.gps_target2.header.stamp = time_stamp.to_msg()
         goal = [lat, lon]
-        actual_global_pose = [self.global_pose.pose.position.latitude, self.global_pose.pose.position.longitude]
+        actual_global_pose = [self.global_pose.latitude, self.global_pose.longitude]
         dist = self.global_dist(goal, actual_global_pose)
         self.get_logger().info("Distance: " + str(dist))
         while dist >= GLOBAL_TOL:
-            self.global_position_pub.publish(self.gps_target)
-            #self.global_position_pub2.publish(self.gps_target2)
+            #self.global_position_pub.publish(self.gps_target)
+            self.global_position_pub2.publish(self.gps_target2)
             actual_global_pose = [self.global_pose.pose.position.latitude, self.global_pose.pose.position.longitude]
             dist = self.global_dist(goal, actual_global_pose)
             self.get_logger().info("Distance: " + str(dist))
@@ -292,9 +297,9 @@ class MAV2(Node):
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
-    #mav.takeoff(5)
+    mav.takeoff(5)
     #mav.go_to_local(-10,5,2, yaw = 3.14, TOL = 0.1)
-    #mav.go_to_global(mav.global_pose.pose.position.latitude + 0.00005, mav.global_pose.pose.position.longitude + 0.000005)
+    mav.go_to_global(mav.global_pose.pose.position.latitude + 0.0005, mav.global_pose.pose.position.longitude + 0.00005)
 
    
    

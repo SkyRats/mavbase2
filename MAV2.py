@@ -197,7 +197,7 @@ class MAV2(Node):
             self.set_position(goal_x, goal_y, goal_z, yaw)
         self.get_logger().info("Arrived at requested position")
 
-    def go_to_global(self, lat, lon, height, GLOBAL_TOL = 0.4, yaw=0):
+    def go_to_global(self, lat, lon, GLOBAL_TOL = 0.4, yaw=0):
         self.get_logger().info("Going to latitude " + str(lat) + ", longitude " + str(lon))
         self.gps_target.pose.position.latitude = lat
         self.gps_target.pose.position.longitude = lon
@@ -213,9 +213,6 @@ class MAV2(Node):
             while self.drone_state.mode != "OFFBOARD":
                 self.global_position_pub.publish(self.gps_target)
                 self.set_mode("OFFBOARD")
-            #self.goal_pose.pose.position.z = height
-            #for i in range(100):
-            #    self.local_position_pub.publish(self.goal_pose)
             self.global_position_pub.publish(self.gps_target)
             actual_global_pose = [self.global_pose.latitude, self.global_pose.longitude]
             dist = self.global_dist(goal, actual_global_pose)
@@ -304,7 +301,7 @@ if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
     mav.takeoff(5)
-    mav.go_to_global(mav.global_pose.latitude + 0.00008, mav.global_pose.longitude + 0.000008, 5.0)
+    #mav.go_to_global(mav.global_pose.latitude + 0.00008, mav.global_pose.longitude + 0.000008, 5.0)
     #mav.go_to_local(0, 0, 5)
    
    

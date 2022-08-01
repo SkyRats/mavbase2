@@ -22,11 +22,11 @@ import math
 import sys
 from cv_bridge import CvBridge 
 from tf_transformations import quaternion_from_euler, euler_from_quaternion
+from pygeodesy.geoids import GeoidPGM
 
 from mavbase2.action import SetPosition 
 
 DEBUG = False
-GLOBAL_TOL = 0.000001
 
 class MAV2(Node):
 
@@ -49,6 +49,7 @@ class MAV2(Node):
         self.cam = Image()
         self.bridge_object = CvBridge()
         self.camera_topic = "/camera/image_raw"
+        self._egm96 = GeoidPGM('/usr/share/GeographicLib/geoids/egm96-5.pgm', kind=-3)
 
         ############# Services ##################
 
@@ -196,11 +197,12 @@ class MAV2(Node):
             self.set_position(goal_x, goal_y, goal_z, yaw)
         self.get_logger().info("Arrived at requested position")
 
-    def go_to_global(self, lat, lon, yaw=0):
+    def go_to_global(self, lat, lon, height, GLOBAL_TOL = 0.4, yaw=0):
         self.get_logger().info("Going to latitude " + str(lat) + ", longitude " + str(lon))
         self.gps_target.pose.position.latitude = lat
         self.gps_target.pose.position.longitude = lon
-        self.gps_target.pose.position.altitude = self.drone_pose.pose.position.z
+        self.gps_target.pose.position.altitude = self.global_pose.altitude - self.geoid_height(lat, lon)
+        self.get_logger().info("Altitude sent: " + str(self.global_pose.altitude))
         time_stamp = Clock().now()
         self.gps_target.header.stamp = time_stamp.to_msg()
         goal = [lat, lon]
@@ -209,13 +211,16 @@ class MAV2(Node):
         self.get_logger().info("Distance: " + str(dist))
         while dist >= GLOBAL_TOL:
             while self.drone_state.mode != "OFFBOARD":
-                self.local_position_pub.publish(self.goal_pose)
+                self.global_position_pub.publish(self.gps_target)
                 self.set_mode("OFFBOARD")
+            #self.goal_pose.pose.position.z = height
+            #for i in range(100):
+            #    self.local_position_pub.publish(self.goal_pose)
             self.global_position_pub.publish(self.gps_target)
             actual_global_pose = [self.global_pose.latitude, self.global_pose.longitude]
             dist = self.global_dist(goal, actual_global_pose)
-            self.get_logger().info("Distance: " + str(dist))
-        self.get_logger().info("Arrived at latitude: " + str(self.global_pose.pose.position.latitude)+ " longitude: " + str(self.global_pose.pose.position.longitude))
+            rclpy.spin_once(self)
+        self.get_logger().info("Arrived at latitude: " + str(self.global_pose.latitude)+ " longitude: " + str(self.global_pose.longitude))
 
     def set_vel(self, x, y, z, yaw = 0):
         while self.drone_state.mode != "OFFBOARD":
@@ -273,6 +278,9 @@ class MAV2(Node):
         #    self.arm_srv.call_async(self.arm_req)
 
     ############ Additional functions #############
+    def geoid_height(self, lat, lon):
+        return self._egm96.height(lat, lon)
+
     def global_dist(self, coord1 , coord2):  # distance from 2 gps coordinates using Haversine function
         #coord1 = [lat, long]
         lat1,lon1=coord1
@@ -296,9 +304,8 @@ if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
     mav.takeoff(5)
-    mav.go_to_local(0, 0, 5, TOL = 0.1)
-    mav.go_to_global(mav.global_pose.latitude + 0.00005, mav.global_pose.longitude + 0.000005)
-
+    mav.go_to_global(mav.global_pose.latitude + 0.00008, mav.global_pose.longitude + 0.000008, 5.0)
+    #mav.go_to_local(0, 0, 5)
    
    
 

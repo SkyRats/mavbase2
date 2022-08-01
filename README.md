@@ -6,6 +6,8 @@ Repository for basic mav functions implemented in ROS 2
 - ```sudo apt install python3-opencv```
 - ```sudo apt install ros-$ROS_DISTRO-tf-transformations```
 - ```pip3 install transforms3d```
+- ```pip3 install pygeodesy```
+- ```pip3 install scipy```
 
 ## Launch options
 This repository also contains launch files used to connect MAVROS in different situations. Here are some examples on how to use them:

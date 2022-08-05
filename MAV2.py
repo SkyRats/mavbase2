@@ -116,12 +116,15 @@ class MAV2(Node):
     def cam_callback(self, cam_data):
         self.cam = self.bridge_object.imgmsg_to_cv2(cam_data,"bgr8")
     
+    ########## Battery verification ##########
     def verify_battery(self):
         percentage = self.battery.percentage
-        while percentage == 0:
-            self.get_logger().info("Battery percentage is zero: " + str(percentage))
-        while percentage != 0:
-            self.get_logger().info("Battery percentage is not zero: " + str(percentage))
+        self.get_logger().info("Waiting for battery topic...")
+        while percentage == 0 and self.battery.voltage == 0:
+            rclpy.spin_once(self)
+        self.get_logger().info("Battery percentage is: " + str(percentage))
+        self.get_logger().info("Battery voltage is: " + str(self.battery.voltage))
+
 
     ###Set mode: PX4 mode - string, timeout (seconds) - int
     def set_mode(self, mode):
@@ -300,10 +303,10 @@ class MAV2(Node):
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
-    mav.takeoff(5)
-    #mav.go_to_global(mav.global_pose.latitude + 0.00008, mav.global_pose.longitude + 0.000008, 5.0)
+    #mav.takeoff(5)
+    #mav.go_to_global(mav.global_pose.latitude + 0.00008, mav.global_pose.longitude + 0.000008)
     #mav.go_to_local(0, 0, 5)
-   
+    #mav.verify_battery()
    
 
     

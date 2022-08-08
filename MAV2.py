@@ -165,10 +165,23 @@ class MAV2(Node):
                 rclpy.spin_once(self)
     
     ####### Goal Position and Velocity #########
-    def set_position(self, x, y, z, yaw = None):
+    def set_position(self, x, y, z, yaw = None, vel_xy = None, vel_z = None):
         self.goal_pose.pose.position.x = float(x)
         self.goal_pose.pose.position.y = float(y)
         self.goal_pose.pose.position.z = float(z)
+        if vel_xy != None:
+            vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=vel_xy, type=ParameterType.PARAMETER_DOUBLE))
+            self.set_param(vel_xy_param_value)
+        else:
+            vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=12.0, type=ParameterType.PARAMETER_DOUBLE))
+            self.set_param(vel_xy_param_value)
+        if vel_z != None:
+           vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=vel_z, type=ParameterType.PARAMETER_DOUBLE))
+           self.set_param(vel_z_param_value)
+        else:
+           vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=-3.0, type=ParameterType.PARAMETER_DOUBLE))
+           self.set_param(vel_z_param_value)
+        rclpy.spin_once(self)
 
         if yaw == None:
             self.goal_pose.pose.orientation = self.drone_pose.pose.orientation
@@ -182,8 +195,9 @@ class MAV2(Node):
             self.local_position_pub.publish(self.goal_pose)
             self.set_mode("OFFBOARD")
         self.local_position_pub.publish(self.goal_pose)
+
     
-    def go_to_local(self, goal_x, goal_y, goal_z, yaw = None, TOL=0.2):
+    def go_to_local(self, goal_x, goal_y, goal_z, yaw = None, vel_xy = None, vel_z = None, TOL=0.2):
         self.get_logger().info("Going towards local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + "), with a yaw angle of: " + str(yaw))
         current_x = self.drone_pose.pose.position.x
         current_y = self.drone_pose.pose.position.y
@@ -197,7 +211,7 @@ class MAV2(Node):
             current_y = self.drone_pose.pose.position.y
             current_z = self.drone_pose.pose.position.z
             [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
-            self.set_position(goal_x, goal_y, goal_z, yaw)
+            self.set_position(goal_x, goal_y, goal_z, yaw, vel_xy, vel_z)
         self.get_logger().info("Arrived at requested position")
 
     def go_to_global(self, lat, lon, GLOBAL_TOL = 0.4, yaw=0):

@@ -226,10 +226,10 @@ class MAV2(Node):
         actual_global_pose = [self.global_pose.latitude, self.global_pose.longitude]
         dist = self.global_dist(goal, actual_global_pose)
         self.get_logger().info("Distance: " + str(dist))
-        while dist >= GLOBAL_TOL:
-            while self.drone_state.mode != "OFFBOARD":
+        while self.drone_state.mode != "OFFBOARD":
                 self.global_position_pub.publish(self.gps_target)
                 self.set_mode("OFFBOARD")
+        while dist >= GLOBAL_TOL:
             self.global_position_pub.publish(self.gps_target)
             actual_global_pose = [self.global_pose.latitude, self.global_pose.longitude]
             dist = self.global_dist(goal, actual_global_pose)

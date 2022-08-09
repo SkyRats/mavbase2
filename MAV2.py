@@ -111,7 +111,8 @@ class MAV2(Node):
         self.drone_pose = data
     
     def global_callback(self, global_data):
-        self.global_pose = global_data    
+        self.global_pose = global_data
+        self.global_altitude = self.global_pose.altitude - self.geoid_height(self.global_pose.latitude, self.global_pose.longitude)    
 
     def cam_callback(self, cam_data):
         self.cam = self.bridge_object.imgmsg_to_cv2(cam_data,"bgr8")
@@ -214,12 +215,11 @@ class MAV2(Node):
             self.set_position(goal_x, goal_y, goal_z, yaw, vel_xy, vel_z)
         self.get_logger().info("Arrived at requested position")
 
-    def go_to_global(self, lat, lon, GLOBAL_TOL = 0.4, yaw=0):
-        self.get_logger().info("Going to latitude " + str(lat) + ", longitude " + str(lon))
+    def go_to_global(self, lat, lon, alt,  GLOBAL_TOL = 0.4, yaw=0):
+        self.get_logger().info("Going to latitude " + str(lat) + ", longitude " + str(lon) + "and altitude: " + str(alt))
         self.gps_target.pose.position.latitude = lat
         self.gps_target.pose.position.longitude = lon
-        self.gps_target.pose.position.altitude = self.global_pose.altitude - self.geoid_height(lat, lon)
-        self.get_logger().info("Altitude sent: " + str(self.global_pose.altitude))
+        self.gps_target.pose.position.altitude = alt
         time_stamp = Clock().now()
         self.gps_target.header.stamp = time_stamp.to_msg()
         goal = [lat, lon]
@@ -317,8 +317,8 @@ class MAV2(Node):
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
-    #mav.takeoff(5)
-    #mav.go_to_global(mav.global_pose.latitude + 0.00008, mav.global_pose.longitude + 0.000008)
+    mav.takeoff(5)
+    mav.go_to_global(mav.global_pose.latitude + 0.00008, mav.global_pose.longitude + 0.000008, mav.global_altitude)
     #mav.go_to_local(0, 0, 5)
     #mav.verify_battery()
    

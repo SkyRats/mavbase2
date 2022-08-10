@@ -215,8 +215,8 @@ class MAV2(Node):
             self.set_position(goal_x, goal_y, goal_z, yaw, vel_xy, vel_z)
         self.get_logger().info("Arrived at requested position")
 
-    def go_to_global(self, lat, lon, alt,  GLOBAL_TOL = 0.4, yaw=0):
-        self.get_logger().info("Going to latitude " + str(lat) + ", longitude " + str(lon) + "and altitude: " + str(alt))
+    def go_to_global(self, lat, lon, alt,  GLOBAL_TOL = 0.2, yaw=0):
+        self.get_logger().info("Going to latitude " + str(lat) + ", longitude " + str(lon) + " and altitude: " + str(alt))
         self.gps_target.pose.position.latitude = lat
         self.gps_target.pose.position.longitude = lon
         self.gps_target.pose.position.altitude = alt
@@ -226,6 +226,9 @@ class MAV2(Node):
         actual_global_pose = [self.global_pose.latitude, self.global_pose.longitude]
         dist = self.global_dist(goal, actual_global_pose)
         self.get_logger().info("Distance: " + str(dist))
+        if dist > 550:
+            self.get_logger().warn("Distance too far! Trajectory cancelled...")
+            return
         while self.drone_state.mode != "OFFBOARD":
                 self.global_position_pub.publish(self.gps_target)
                 self.set_mode("OFFBOARD")
@@ -318,8 +321,12 @@ if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
     mav.takeoff(5)
-    mav.go_to_global(mav.global_pose.latitude + 0.00008, mav.global_pose.longitude + 0.000008, mav.global_altitude)
+    #mav.go_to_global(mav.global_pose.latitude + 0.000008, mav.global_pose.longitude + 0.000008, mav.global_altitude)
+    #mav.go_to_local(7, 0, 5)
+    #mav.get_logger().info("GPS coordinates: " + str(mav.global_pose.latitude) + " lat " + str(mav.global_pose.longitude) + " lon")
     #mav.go_to_local(0, 0, 5)
+    mav.go_to_global(47.3977422, 8.5456861, mav.global_altitude)
+    mav.land()
     #mav.verify_battery()
    
 

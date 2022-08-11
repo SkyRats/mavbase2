@@ -294,6 +294,43 @@ class MAV2(Node):
         #    self.land()
         #    self.arm_srv.call_async(self.arm_req)
 
+    ############ Mission Functions ############
+    def mission_start(self):
+        self.__arm()
+        self.get_logger().info('STARTING MISSION MODE')
+        self.set_mode("AUTO.MISSION")
+    
+    def mission_pause(self):
+        self.get_logger().info('PAUSING MISSION MODE')
+        self.set_mode("AUTO.LOITER")
+
+    def mission_get_waypoints_list(self):
+        future = self.waypoint_pull_srv.call_async(self.waypoint_pull_req)
+        while future.result() == None:
+            rclpy.spin_once(self)
+        return self.waypoints_list.waypoints
+    
+    def mission_get_current_waypoint(self):
+        future = self.waypoint_pull_srv.call_async(self.waypoint_pull_req)
+        while future.result() == None:
+            rclpy.spin_once(self)
+        return self.waypoints_list.current_seq
+    
+    def mission_set_current_waypoint(self,wp_number):
+        self.waypoint_set_req.wp_seq = wp_number
+        future = self.waypoint_set_srv.call_async(self.waypoint_set_req)
+        while future.result() == None:
+            rclpy.spin_once(self)
+        return future.result().success
+    
+    def mission_infinite_loop(self): #WARNING THIS IS AN INFINITE LOOP, SHOULD BE USED FOR DEBUG ONLY!
+        self.get_logger().error('INFINITE MISSION MODE, IF THIS IS NOT A SIMULATION, KILL THE PROGRAM')
+        self.mission_start()
+        while True:
+            if self.mission_get_current_waypoint() == len(self.mission_get_waypoints_list())-1:
+                print("setting waypoint 0")
+                self.mission_set_current_waypoint(0)
+                
     ############ Additional functions #############
     def geoid_height(self, lat, lon):
         return self._egm96.height(lat, lon)

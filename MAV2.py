@@ -353,6 +353,29 @@ class MAV2(Node):
         c=2*math.atan2(math.sqrt(a),math.sqrt(1-a))
         
         return R*c                             # output distance in meters
+    
+    def camera_pid(self, delta_x, delta_y, delta_area):
+        self.TARGET = (int(self.cam.shape[0]/2), int(self.cam.shape[1]/2))
+        self.TOL = 0.0140
+        self.PID = 1/2000
+        self.PID_area = 1/500000
+
+        # Centralization PID
+        vel_x = delta_y * self.PID
+        vel_y = delta_x * self.PID
+        vel_z = delta_area * self.PID_area
+
+        # Set PID tolerances
+        if abs(vel_x) < self.TOL:
+            vel_x = 0.0
+        if abs(vel_y) < self.TOL:
+            vel_y = 0.0
+        if abs(vel_z) < self.TOL:
+            vel_z = 0.0
+        
+        # Set drone instant velocity
+        self.set_vel(vel_x, vel_y, vel_z)
+        self.get_logger().info(f"Set_vel -> x: {vel_x} y: {vel_y} z: {vel_z}")
 
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)

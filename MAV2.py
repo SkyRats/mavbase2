@@ -215,7 +215,7 @@ class MAV2(Node):
             self.set_position(goal_x, goal_y, goal_z, yaw, vel_xy, vel_z)
         self.get_logger().info("Arrived at requested position")
 
-    def go_to_global(self, lat, lon, alt,  GLOBAL_TOL = 0.2, yaw=0):
+    def go_to_global(self, lat, lon, alt,yaw=0, vel_xy = None, vel_z = None, GLOBAL_TOL = 0.2):
         self.get_logger().info("Going to latitude " + str(lat) + ", longitude " + str(lon) + " and altitude: " + str(alt))
         self.gps_target.pose.position.latitude = lat
         self.gps_target.pose.position.longitude = lon
@@ -229,6 +229,19 @@ class MAV2(Node):
         if dist > 550:
             self.get_logger().warn("Distance too far! Trajectory cancelled...")
             return
+        if vel_xy != None:
+            vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=vel_xy, type=ParameterType.PARAMETER_DOUBLE))
+            self.set_param(vel_xy_param_value)
+        else:
+            vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=12.0, type=ParameterType.PARAMETER_DOUBLE))
+            self.set_param(vel_xy_param_value)
+        if vel_z != None:
+           vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=vel_z, type=ParameterType.PARAMETER_DOUBLE))
+           self.set_param(vel_z_param_value)
+        else:
+           vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=-3.0, type=ParameterType.PARAMETER_DOUBLE))
+           self.set_param(vel_z_param_value)
+        rclpy.spin_once(self)
         while self.drone_state.mode != "OFFBOARD":
                 self.global_position_pub.publish(self.gps_target)
                 self.set_mode("OFFBOARD")
@@ -385,7 +398,7 @@ if __name__ == '__main__':
     #mav.go_to_local(7, 0, 5)
     #mav.get_logger().info("GPS coordinates: " + str(mav.global_pose.latitude) + " lat " + str(mav.global_pose.longitude) + " lon")
     #mav.go_to_local(0, 0, 5)
-    mav.go_to_global(47.3977422, 8.5456861, mav.global_altitude)
+    mav.go_to_global(47.3977422, 8.5456861, mav.global_altitude, 0, 5)
     mav.land()
     #mav.verify_battery()
    

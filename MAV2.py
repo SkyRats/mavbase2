@@ -141,6 +141,7 @@ class MAV2(Node):
     def set_param(self, param_value):
         self.param_set_req.parameters = [param_value]
         self.param_set_srv.call_async(self.param_set_req)
+        rclpy.spin_once(self)
 
     def takeoff(self, height, speed=1.5, safety_on=True):
         height = float(height)
@@ -232,6 +233,7 @@ class MAV2(Node):
         if vel_xy != None:
             vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=float(vel_xy), type=ParameterType.PARAMETER_DOUBLE))
             self.set_param(vel_xy_param_value)
+            self.get_logger().info("Velocity parameter set to " +str(vel_xy))
         else:
             vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=12.0, type=ParameterType.PARAMETER_DOUBLE))
             self.set_param(vel_xy_param_value)
@@ -395,11 +397,10 @@ if __name__ == '__main__':
     mav = MAV2()
     mav.takeoff(5)
     #mav.go_to_global(mav.global_pose.latitude + 0.000008, mav.global_pose.longitude + 0.000008, mav.global_altitude)
-    #mav.go_to_local(7, 0, 5)
     #mav.get_logger().info("GPS coordinates: " + str(mav.global_pose.latitude) + " lat " + str(mav.global_pose.longitude) + " lon")
-    #mav.go_to_local(0, 0, 5)
-    mav.go_to_global(47.3977422, 8.5456861, mav.global_altitude, 0, 1)
-    mav.land()
+    #mav.go_to_local(0, 0, 5, 0, 1)
+    #mav.go_to_global(47.3977422, 8.5456861, mav.global_altitude, 0, 1)
+    #mav.land()
     #mav.verify_battery()
    
 

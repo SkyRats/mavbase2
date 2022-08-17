@@ -167,24 +167,10 @@ class MAV2(Node):
                 rclpy.spin_once(self)
     
     ####### Goal Position and Velocity #########
-    def set_position(self, x, y, z, yaw = None, vel_xy = None, vel_z = None):
+    def set_position(self, x, y, z, yaw = None):
         self.goal_pose.pose.position.x = float(x)
         self.goal_pose.pose.position.y = float(y)
         self.goal_pose.pose.position.z = float(z)
-        if vel_xy != None:
-            vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=float(vel_xy), type=ParameterType.PARAMETER_DOUBLE))
-            self.set_param(vel_xy_param_value)
-        else:
-            vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=12.0, type=ParameterType.PARAMETER_DOUBLE))
-            self.set_param(vel_xy_param_value)
-        if vel_z != None:
-           vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=float(vel_z), type=ParameterType.PARAMETER_DOUBLE))
-           self.set_param(vel_z_param_value)
-        else:
-           vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=-3.0, type=ParameterType.PARAMETER_DOUBLE))
-           self.set_param(vel_z_param_value)
-        rclpy.spin_once(self)
-
         if yaw == None:
             self.goal_pose.pose.orientation = self.drone_pose.pose.orientation
         else:
@@ -207,13 +193,14 @@ class MAV2(Node):
         [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
         if yaw == None:
             yaw = current_yaw
+        self.change_auto_speed(vel_xy, vel_z)
         while(np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2) + (current_yaw - yaw)**2) > TOL:
             rclpy.spin_once(self)
             current_x = self.drone_pose.pose.position.x
             current_y = self.drone_pose.pose.position.y
             current_z = self.drone_pose.pose.position.z
             [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
-            self.set_position(goal_x, goal_y, goal_z, yaw, vel_xy, vel_z)
+            self.set_position(goal_x, goal_y, goal_z, yaw)
         self.get_logger().info("Arrived at requested position")
 
     def go_to_global(self, lat, lon, alt,yaw=0, vel_xy = None, vel_z = None, GLOBAL_TOL = 0.2):
@@ -230,6 +217,18 @@ class MAV2(Node):
         if dist > 550:
             self.get_logger().warn("Distance too far! Trajectory cancelled...")
             return
+        self.change_auto_speed(vel_xy, vel_z)
+        while self.drone_state.mode != "OFFBOARD":
+                self.global_position_pub.publish(self.gps_target)
+                self.set_mode("OFFBOARD")
+        while dist >= GLOBAL_TOL:
+            self.global_position_pub.publish(self.gps_target)
+            actual_global_pose = [self.global_pose.latitude, self.global_pose.longitude]
+            dist = self.global_dist(goal, actual_global_pose)
+            rclpy.spin_once(self)
+        self.get_logger().info("Arrived at latitude: " + str(self.global_pose.latitude)+ " longitude: " + str(self.global_pose.longitude))
+
+    def change_auto_speed(self, vel_xy = None, vel_z = None):
         if vel_xy != None:
             vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=float(vel_xy), type=ParameterType.PARAMETER_DOUBLE))
             self.set_param(vel_xy_param_value)
@@ -244,15 +243,6 @@ class MAV2(Node):
            vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=-3.0, type=ParameterType.PARAMETER_DOUBLE))
            self.set_param(vel_z_param_value)
         rclpy.spin_once(self)
-        while self.drone_state.mode != "OFFBOARD":
-                self.global_position_pub.publish(self.gps_target)
-                self.set_mode("OFFBOARD")
-        while dist >= GLOBAL_TOL:
-            self.global_position_pub.publish(self.gps_target)
-            actual_global_pose = [self.global_pose.latitude, self.global_pose.longitude]
-            dist = self.global_dist(goal, actual_global_pose)
-            rclpy.spin_once(self)
-        self.get_logger().info("Arrived at latitude: " + str(self.global_pose.latitude)+ " longitude: " + str(self.global_pose.longitude))
 
     def set_vel(self, x, y, z, yaw = 0):
         while self.drone_state.mode != "OFFBOARD":
@@ -369,6 +359,7 @@ class MAV2(Node):
         
         return R*c                             # output distance in meters
     
+    ############# Centralization Functions #############
     def camera_pid(self, delta_x, delta_y, delta_area):
         self.TARGET = (int(self.cam.shape[0]/2), int(self.cam.shape[1]/2))
         self.TOL = 0.0140
@@ -398,8 +389,9 @@ if __name__ == '__main__':
     mav.takeoff(5)
     #mav.go_to_global(mav.global_pose.latitude + 0.000008, mav.global_pose.longitude + 0.000008, mav.global_altitude)
     #mav.get_logger().info("GPS coordinates: " + str(mav.global_pose.latitude) + " lat " + str(mav.global_pose.longitude) + " lon")
-    #mav.go_to_local(0, 0, 5, 0, 1)
-    #mav.go_to_global(47.3977422, 8.5456861, mav.global_altitude, 0, 1)
+    #mav.go_to_local(0, 0, 5, vel_xy=1)
+    #mav.go_to_global(47.3977422, 8.5456861, mav.global_altitude, vel_xy=10)
+    mav.change_auto_speed(0.1)
     #mav.land()
     #mav.verify_battery()
    

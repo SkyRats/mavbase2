@@ -232,16 +232,19 @@ class MAV2(Node):
         if vel_xy != None:
             vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=float(vel_xy), type=ParameterType.PARAMETER_DOUBLE))
             self.set_param(vel_xy_param_value)
-            self.get_logger().info("Velocity parameter set to " +str(vel_xy))
+            self.get_logger().info("Horizontal velocity parameter set to " +str(vel_xy))
         else:
             vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=12.0, type=ParameterType.PARAMETER_DOUBLE))
             self.set_param(vel_xy_param_value)
+            self.get_logger().info("Horizontal velocity parameter set to default")
         if vel_z != None:
            vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=float(vel_z), type=ParameterType.PARAMETER_DOUBLE))
            self.set_param(vel_z_param_value)
+           self.get_logger().info("Vertical velocity parameter set to " +str(vel_z))
         else:
            vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=-3.0, type=ParameterType.PARAMETER_DOUBLE))
            self.set_param(vel_z_param_value)
+           self.get_logger().info("Vertical velocity parameter set to default")
         rclpy.spin_once(self)
 
     def set_vel(self, x, y, z, yaw = 0):

@@ -276,6 +276,8 @@ class MAV2(Node):
 
     def land(self, auto_disarm=True, speed=0.7):
         self.get_logger().info("Landing...")
+        rclpy.spin_once(self)
+
         if auto_disarm:
             auto_disarm_param_value= Parameter(name= 'COM_DISARM_LAND', value=ParameterValue(double_value= 2.0, type=ParameterType.PARAMETER_DOUBLE))
         else:
@@ -285,6 +287,9 @@ class MAV2(Node):
         speed = float(speed)
         land_speed_param_value= Parameter(name= 'MPC_LAND_SPEED', value=ParameterValue(double_value= speed, type=ParameterType.PARAMETER_DOUBLE))
         self.set_param(land_speed_param_value)
+
+        vel_z_general_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=float(speed), type=ParameterType.PARAMETER_DOUBLE))
+        self.set_param(vel_z_general_param_value)
 
         self.set_mode('AUTO.LAND')
 
@@ -344,7 +349,7 @@ class MAV2(Node):
     def mission_infinite_loop(self): #WARNING THIS IS AN INFINITE LOOP, SHOULD BE USED FOR DEBUG ONLY!
         self.get_logger().error('INFINITE MISSION MODE, IF THIS IS NOT A SIMULATION, KILL THE PROGRAM')
         self.mission_start()
-        while True:
+        while rclpy.ok():
             if self.mission_get_current_waypoint() == len(self.mission_get_waypoints_list())-1:
                 print("setting waypoint 0")
                 self.mission_set_current_waypoint(0)

@@ -153,10 +153,10 @@ class MAV2(Node):
         speed_param_value = Parameter(name= 'MPC_TKO_SPEED', value=ParameterValue(double_value=speed, type=ParameterType.PARAMETER_DOUBLE))
         self.set_param(speed_param_value)
         rclpy.spin_once(self)
-        if self.drone_state.armed:
-            self.get_logger().error("Drone already armed! Takeoff cancelled")
+        if self.drone_state.armed and self.drone_state.mode != "AUTO.LAND":
+            self.get_logger().error("Drone is flying! Takeoff cancelled")
             return
-        self.__arm()
+        self.arm()
         self.set_mode("AUTO.TAKEOFF")
         
         #safety measures: locks program while taking off
@@ -290,14 +290,14 @@ class MAV2(Node):
 
     ########## Arm #######
 
-    def __arm(self):
+    def arm(self):
         self.get_logger().warn('ARMING MAV')
         self.arm_req.value = True
         self.arm_srv.call_async(self.arm_req)
         
 
     ########## Disarm #######
-    def __disarm(self):
+    def disarm(self):
         self.get_logger().warn('DISARMING MAV')
         self.arm_req.value = False
         self.arm_srv.call_async(self.arm_req) #substituir isso por um metodo mais seguro depois (comentei pq o subscriber de pose n ta funcionando)
@@ -314,7 +314,7 @@ class MAV2(Node):
 
     ############ Mission Functions ############
     def mission_start(self):
-        self.__arm()
+        self.arm()
         self.get_logger().info('STARTING MISSION MODE')
         self.set_mode("AUTO.MISSION")
     

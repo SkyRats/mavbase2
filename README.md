@@ -9,6 +9,23 @@ Repository for basic mav functions implemented in ROS 2
 - ```pip3 install pygeodesy```
 - ```pip3 install scipy```
 
+## Autonomous flight testing
+In order to test autonomous flights, you can run the ```mav_testing.py```. This script follows the mission above:
+1. Takeoff to 3 m
+2. Go to local position (2, 0, 0)
+3. Hold for 5 seconds
+4. Landscript
+
+### Testing onboard
+In your computer, open 2 different terminals. In the fisrt one, run the following command:
+```bash
+ros2 launch mavbase2 px4_telemetry.launch.py
+```
+In the other terminal, go the the mavbase2 package directory and run:
+```bash
+python3 mav_testing.py
+```
+
 ## Launch options
 This repository also contains launch files used to connect MAVROS in different situations. Here are some examples on how to use them:
 ### Simulation in the loop (SITL)

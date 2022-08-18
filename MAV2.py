@@ -165,6 +165,15 @@ class MAV2(Node):
                 rclpy.spin_once(self)
             while self.drone_state.mode == "AUTO.TAKEOFF":
                 rclpy.spin_once(self)
+
+    def hold(self, hold_time): # hold time in seconds
+        init = now = self.get_clock().now()
+        now = self.get_clock().now()
+        time = rclpy.duration.Duration(seconds=hold_time, nanoseconds=0)
+        self.get_logger().info("Goind on hold for " + str(hold_time) + " s")
+        while (now - init).nanoseconds < hold_time*10**9:
+            self.set_position(self.drone_pose.pose.position.x, self.drone_pose.pose.position.y, self.drone_pose.pose.position.z)
+            now = self.get_clock().now()
     
     ####### Goal Position and Velocity #########
     def set_position(self, x, y, z, yaw = None):
@@ -266,6 +275,7 @@ class MAV2(Node):
 
 
     def land(self, auto_disarm=True, speed=0.7):
+        self.get_logger().info("Landing...")
         if auto_disarm:
             auto_disarm_param_value= Parameter(name= 'COM_DISARM_LAND', value=ParameterValue(double_value= 2.0, type=ParameterType.PARAMETER_DOUBLE))
         else:

@@ -347,7 +347,7 @@ class MAV2(Node):
         return future.result().success
     
     def mission_infinite_loop(self): #WARNING THIS IS AN INFINITE LOOP, SHOULD BE USED FOR DEBUG ONLY!
-        self.get_logger().error('INFINITE MISSION MODE, IF THIS IS NOT A SIMULATION, KILL THE PROGRAM')
+        self.get_logger().error('INFINITE MISSION MODE, KILL THE PROGRAM TO EXIT')
         self.mission_start()
         while rclpy.ok():
             if self.mission_get_current_waypoint() == len(self.mission_get_waypoints_list())-1:

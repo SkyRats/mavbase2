@@ -14,7 +14,7 @@ In order to test autonomous flights, you can run the ```mav_testing.py```. This 
 1. Takeoff to 3 m
 2. Go to local position (2, 0, 0)
 3. Hold for 5 seconds
-4. Landscript
+4. Land
 
 ### Testing onboard
 In your computer, open 2 different terminals. In the fisrt one, run the following command:

@@ -144,6 +144,7 @@ class MAV2(Node):
         rclpy.spin_once(self)
 
     def takeoff(self, height, speed=1.5, safety_on=True):
+        self.get_logger().info("Taking off...")
         height = float(height)
 
         alt_param_value = Parameter(name= 'MIS_TAKEOFF_ALT', value=ParameterValue(double_value=height, type=ParameterType.PARAMETER_DOUBLE))
@@ -152,6 +153,9 @@ class MAV2(Node):
         speed = float(speed)
         speed_param_value = Parameter(name= 'MPC_TKO_SPEED', value=ParameterValue(double_value=speed, type=ParameterType.PARAMETER_DOUBLE))
         self.set_param(speed_param_value)
+        vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=speed, type=ParameterType.PARAMETER_DOUBLE))
+        self.set_param(vel_z_param_value)
+        
         rclpy.spin_once(self)
         if self.drone_state.armed and self.drone_state.mode != "AUTO.LAND":
             self.get_logger().error("Drone is flying! Takeoff cancelled")

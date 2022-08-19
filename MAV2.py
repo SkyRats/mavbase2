@@ -43,6 +43,7 @@ class MAV2(Node):
         self.pose_target = PositionTarget()
         self.goal_vel = TwistStamped()
         self.drone_state = State()
+        self.drone_extended_state = ExtendedState()
         self.battery = BatteryState()
         self.global_pose = NavSatFix()
         self.gps_target = GeoPoseStamped()
@@ -76,6 +77,7 @@ class MAV2(Node):
 
         self.local_atual = self.create_subscription(PoseStamped, '/mavros/local_position/pose', self.local_callback, qos.qos_profile_sensor_data)
         self.state_sub =  self.create_subscription(State, '/mavros/state', self.state_callback, qos.qos_profile_sensor_data)
+        self.extended_state_sub =  self.create_subscription(ExtendedState, '/mavros/extended_state', self.extended_state_callback, qos.qos_profile_sensor_data)
         self.battery_sub =  self.create_subscription(BatteryState, '/mavros/battery', self.battery_callback, qos.qos_profile_sensor_data)
         self.global_position_sub =  self.create_subscription(NavSatFix,'/mavros/global_position/global' , self.global_callback, qos.qos_profile_sensor_data)
         self.cam_sub = self.create_subscription(Image, self.camera_topic, self.cam_callback, qos.qos_profile_sensor_data)
@@ -103,6 +105,15 @@ class MAV2(Node):
     
     def state_callback(self, state_data):
         self.drone_state = state_data
+    
+    def extended_state_callback(self, extended_state_data):
+        self.drone_extended_state = extended_state_data
+        #Values for referente self.drone_extended_state.landed_state
+        #uint8 LANDED_STATE_UNDEFINED = 0
+        #uint8 LANDED_STATE_ON_GROUND = 1
+        #uint8 LANDED_STATE_IN_AIR = 2
+        #uint8 LANDED_STATE_TAKEOFF = 3
+        #uint8 LANDED_STATE_LANDING = 4
 
     def battery_callback (self, battery_data):
         self.battery = battery_data
@@ -132,6 +143,8 @@ class MAV2(Node):
         #self.get_logger().info("setting FCU mode: {0}".format(mode))
         self.set_mode_req.base_mode = 0
         self.set_mode_req.custom_mode = mode
+        while not self.set_mode_srv.wait_for_service(timeout_sec=5):
+            self.get_logger().info('Set mode service not available, waiting again...')
         future = self.set_mode_srv.call_async(self.set_mode_req)  # 0 is custom mode
         while future.result() == None:
             rclpy.spin_once(self)
@@ -140,6 +153,8 @@ class MAV2(Node):
             
     def set_param(self, param_value):
         self.param_set_req.parameters = [param_value]
+        while not self.param_set_srv.wait_for_service(timeout_sec=5):
+            self.get_logger().info('Set param service not available, waiting again...')
         self.param_set_srv.call_async(self.param_set_req)
         rclpy.spin_once(self)
 
@@ -155,18 +170,20 @@ class MAV2(Node):
         self.set_param(vel_z_param_value)
         
         rclpy.spin_once(self)
-        if self.drone_state.armed and self.drone_state.mode != "AUTO.LAND":
-            self.get_logger().error("Drone is flying! Takeoff cancelled")
+        if self.drone_extended_state.landed_state != 1:
+            print(self.drone_extended_state.landed_state)
+            self.get_logger().error("Drone is not grounded! Takeoff cancelled")
             return
         self.arm()
         self.set_mode("AUTO.TAKEOFF")
         
         #safety measures: locks program while taking off
         if safety_on:
-            while self.drone_state.mode != "AUTO.TAKEOFF":
+            while self.drone_extended_state.landed_state != 3:
                 rclpy.spin_once(self)
-            while self.drone_state.mode == "AUTO.TAKEOFF":
+            while self.drone_extended_state.landed_state == 3:
                 rclpy.spin_once(self)
+        self.get_logger().info("Takeoff completed!")
 
     def hold(self, hold_time): # hold time in seconds
         init = now = self.get_clock().now()
@@ -276,15 +293,9 @@ class MAV2(Node):
         self.velocity_pub.publish(self.goal_vel)    
 
 
-    def land(self, auto_disarm=True, speed=0.7):
+    def land(self, auto_disarm=True, speed=0.7, safety_on=True):
         self.get_logger().info("Landing...")
         rclpy.spin_once(self)
-
-        if auto_disarm:
-            auto_disarm_param_value= Parameter(name= 'COM_DISARM_LAND', value=ParameterValue(double_value= 2.0, type=ParameterType.PARAMETER_DOUBLE))
-        else:
-            auto_disarm_param_value= Parameter(name= 'COM_DISARM_LAND', value=ParameterValue(double_value= -1.0, type=ParameterType.PARAMETER_DOUBLE))
-        self.set_param(auto_disarm_param_value)
 
         land_speed_param_value= Parameter(name= 'MPC_LAND_SPEED', value=ParameterValue(double_value= float(speed), type=ParameterType.PARAMETER_DOUBLE))
         self.set_param(land_speed_param_value)
@@ -294,19 +305,35 @@ class MAV2(Node):
 
         self.set_mode('AUTO.LAND')
 
+        if safety_on:
+            while self.drone_extended_state.landed_state != 4:
+                rclpy.spin_once(self)
+            while self.drone_extended_state.landed_state == 4:
+                rclpy.spin_once(self)
+        self.get_logger().info("Landing completed!")
+
+        if auto_disarm:
+            self.disarm()
+        
     ########## Arm #######
 
     def arm(self):
         self.get_logger().warn('ARMING MAV')
         self.arm_req.value = True
+        while not self.arm_srv.wait_for_service(timeout_sec=5):
+            self.get_logger().info('Arm/Disarm service not available, waiting again...')
         self.arm_srv.call_async(self.arm_req)
+        self.get_logger().warn('Drone is armed')
         
 
     ########## Disarm #######
     def disarm(self):
         self.get_logger().warn('DISARMING MAV')
         self.arm_req.value = False
-        self.arm_srv.call_async(self.arm_req) #substituir isso por um metodo mais seguro depois (comentei pq o subscriber de pose n ta funcionando)
+        while not self.arm_srv.wait_for_service(timeout_sec=5):
+            self.get_logger().info('Arm/Disarm service not available, waiting again...')
+        self.arm_srv.call_async(self.arm_req)
+        self.get_logger().warn('Drone is disarmed')
         #if self.drone_pose.pose.position.z < TOL:
         #    for i in range(3):
                 #self.arm_srv.call_async(self.arm_req)
@@ -329,12 +356,16 @@ class MAV2(Node):
         self.set_mode("AUTO.LOITER")
 
     def mission_get_waypoints_list(self):
+        while not self.waypoint_pull_srv.wait_for_service(timeout_sec=5):
+            self.get_logger().info('Waypoint pull service not available, waiting again...')
         future = self.waypoint_pull_srv.call_async(self.waypoint_pull_req)
         while future.result() == None:
             rclpy.spin_once(self)
         return self.waypoints_list.waypoints
     
     def mission_get_current_waypoint(self):
+        while not self.waypoint_pull_srv.wait_for_service(timeout_sec=5):
+            self.get_logger().info('Waypoint pull service not available, waiting again...')
         future = self.waypoint_pull_srv.call_async(self.waypoint_pull_req)
         while future.result() == None:
             rclpy.spin_once(self)
@@ -342,6 +373,8 @@ class MAV2(Node):
     
     def mission_set_current_waypoint(self,wp_number):
         self.waypoint_set_req.wp_seq = wp_number
+        while not self.waypoint_set_srv.wait_for_service(timeout_sec=5):
+            self.get_logger().info('Waypoint set service not available, waiting again...')
         future = self.waypoint_set_srv.call_async(self.waypoint_set_req)
         while future.result() == None:
             rclpy.spin_once(self)
@@ -405,12 +438,14 @@ class MAV2(Node):
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
-    mav.takeoff(5)
+    while rclpy.ok():
+        mav.takeoff(5)
+        mav.land()
     #mav.go_to_global(mav.global_pose.latitude + 0.000008, mav.global_pose.longitude + 0.000008, mav.global_altitude)
     #mav.get_logger().info("GPS coordinates: " + str(mav.global_pose.latitude) + " lat " + str(mav.global_pose.longitude) + " lon")
     #mav.go_to_local(0, 0, 5, vel_xy=1)
     #mav.go_to_global(47.3977422, 8.5456861, mav.global_altitude, vel_xy=10)
-    mav.change_auto_speed(0.1)
+    #mav.change_auto_speed(0.1)
     #mav.land()
     #mav.verify_battery()
    

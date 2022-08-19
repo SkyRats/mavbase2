@@ -145,15 +145,13 @@ class MAV2(Node):
 
     def takeoff(self, height, speed=1.5, safety_on=True):
         self.get_logger().info("Taking off...")
-        height = float(height)
 
-        alt_param_value = Parameter(name= 'MIS_TAKEOFF_ALT', value=ParameterValue(double_value=height, type=ParameterType.PARAMETER_DOUBLE))
+        alt_param_value = Parameter(name= 'MIS_TAKEOFF_ALT', value=ParameterValue(double_value=float(height), type=ParameterType.PARAMETER_DOUBLE))
         self.set_param(alt_param_value)
         
-        speed = float(speed)
-        speed_param_value = Parameter(name= 'MPC_TKO_SPEED', value=ParameterValue(double_value=speed, type=ParameterType.PARAMETER_DOUBLE))
+        speed_param_value = Parameter(name= 'MPC_TKO_SPEED', value=ParameterValue(double_value=float(speed), type=ParameterType.PARAMETER_DOUBLE))
         self.set_param(speed_param_value)
-        vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=speed, type=ParameterType.PARAMETER_DOUBLE))
+        vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=float(speed), type=ParameterType.PARAMETER_DOUBLE))
         self.set_param(vel_z_param_value)
         
         rclpy.spin_once(self)
@@ -288,8 +286,7 @@ class MAV2(Node):
             auto_disarm_param_value= Parameter(name= 'COM_DISARM_LAND', value=ParameterValue(double_value= -1.0, type=ParameterType.PARAMETER_DOUBLE))
         self.set_param(auto_disarm_param_value)
 
-        speed = float(speed)
-        land_speed_param_value= Parameter(name= 'MPC_LAND_SPEED', value=ParameterValue(double_value= speed, type=ParameterType.PARAMETER_DOUBLE))
+        land_speed_param_value= Parameter(name= 'MPC_LAND_SPEED', value=ParameterValue(double_value= float(speed), type=ParameterType.PARAMETER_DOUBLE))
         self.set_param(land_speed_param_value)
 
         vel_z_general_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=float(speed), type=ParameterType.PARAMETER_DOUBLE))

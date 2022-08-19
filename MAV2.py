@@ -164,10 +164,10 @@ class MAV2(Node):
         alt_param_value = Parameter(name= 'MIS_TAKEOFF_ALT', value=ParameterValue(double_value=float(height), type=ParameterType.PARAMETER_DOUBLE))
         self.set_param(alt_param_value)
         
+        vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=-3.0, type=ParameterType.PARAMETER_DOUBLE))
+        self.set_param(vel_z_param_value)
         speed_param_value = Parameter(name= 'MPC_TKO_SPEED', value=ParameterValue(double_value=float(speed), type=ParameterType.PARAMETER_DOUBLE))
         self.set_param(speed_param_value)
-        vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=float(speed), type=ParameterType.PARAMETER_DOUBLE))
-        self.set_param(vel_z_param_value)
         
         rclpy.spin_once(self)
         if self.drone_extended_state.landed_state != 1:
@@ -297,11 +297,10 @@ class MAV2(Node):
         self.get_logger().info("Landing...")
         rclpy.spin_once(self)
 
+        vel_z_general_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=-3.0, type=ParameterType.PARAMETER_DOUBLE))
+        self.set_param(vel_z_general_param_value)
         land_speed_param_value= Parameter(name= 'MPC_LAND_SPEED', value=ParameterValue(double_value= float(speed), type=ParameterType.PARAMETER_DOUBLE))
         self.set_param(land_speed_param_value)
-
-        vel_z_general_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=float(speed), type=ParameterType.PARAMETER_DOUBLE))
-        self.set_param(vel_z_general_param_value)
 
         self.set_mode('AUTO.LAND')
 

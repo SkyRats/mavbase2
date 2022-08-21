@@ -4,7 +4,7 @@ from tkinter import SEL
 from turtle import position
 import rclpy
 from mavros_msgs import srv
-from mavros_msgs.srv import SetMode, CommandBool
+from mavros_msgs.srv import SetMode, CommandBool, WaypointPull, WaypointSetCurrent
 from rcl_interfaces.msg import ParameterType, Parameter, ParameterValue
 from rcl_interfaces.srv import SetParameters
 from mavros_msgs.msg import State, ExtendedState, PositionTarget
@@ -59,6 +59,10 @@ class MAV2(Node):
         self.arm_srv = self.create_client(CommandBool, '/mavros/cmd/arming')
 
         self.param_set_srv = self.create_client(SetParameters,'/mavros/param/set_parameters')
+
+        self.waypoint_pull_srv = sefl.create_client(WaypointPull,"/mavros/mission/pull")
+
+        self.waypoint_set_srv = sefl.create_client(WaypointSetCurrent,"/mavros/mission/set_current")
         
         ############## Action Server ##################
         self.setPosition_action_server = SetPositionActionServer()
@@ -94,7 +98,10 @@ class MAV2(Node):
         self.arm_req = CommandBool.Request()
         self.set_mode_req = SetMode.Request()
         self.param_set_req = SetParameters.Request()
+        self.waypoint_pull_req = WaypointPull.Request()
+        self.waypoint_set_req = WaypointSetCurrent.Request()
         self.get_logger().info("Services are up")
+        
 
         while self.drone_state.mode == "":
             rclpy.spin_once(self)

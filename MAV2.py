@@ -5,9 +5,9 @@ from turtle import position
 import rclpy
 from mavros_msgs import srv
 from mavros_msgs.srv import SetMode, CommandBool, WaypointPull, WaypointSetCurrent
+from mavros_msgs.msg import State, ExtendedState, PositionTarget, WaypointList
 from rcl_interfaces.msg import ParameterType, Parameter, ParameterValue
 from rcl_interfaces.srv import SetParameters
-from mavros_msgs.msg import State, ExtendedState, PositionTarget
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from geographic_msgs.msg import GeoPoseStamped
 from sensor_msgs.msg import BatteryState, NavSatFix, Image
@@ -60,9 +60,9 @@ class MAV2(Node):
 
         self.param_set_srv = self.create_client(SetParameters,'/mavros/param/set_parameters')
 
-        self.waypoint_pull_srv = sefl.create_client(WaypointPull,"/mavros/mission/pull")
+        self.waypoint_pull_srv = self.create_client(WaypointPull,"/mavros/mission/pull")
 
-        self.waypoint_set_srv = sefl.create_client(WaypointSetCurrent,"/mavros/mission/set_current")
+        self.waypoint_set_srv = self.create_client(WaypointSetCurrent,"/mavros/mission/set_current")
         
         ############## Action Server ##################
         self.setPosition_action_server = SetPositionActionServer()
@@ -85,7 +85,7 @@ class MAV2(Node):
         self.battery_sub =  self.create_subscription(BatteryState, '/mavros/battery', self.battery_callback, qos.qos_profile_sensor_data)
         self.global_position_sub =  self.create_subscription(NavSatFix,'/mavros/global_position/global' , self.global_callback, qos.qos_profile_sensor_data)
         self.cam_sub = self.create_subscription(Image, self.camera_topic, self.cam_callback, qos.qos_profile_sensor_data)
-
+        self.waypoints_sub =self.create_subscription(WaypointList, '/mavros/mission/waypoints', self.waypoints_callback, qos.qos_profile_sensor_data)
 
         service_timeout = 15
         while not self.set_mode_srv.wait_for_service(timeout_sec=service_timeout):
@@ -134,6 +134,9 @@ class MAV2(Node):
 
     def cam_callback(self, cam_data):
         self.cam = self.bridge_object.imgmsg_to_cv2(cam_data,"bgr8")
+    
+    def waypoints_callback(self, waypoints_data):
+        self.received_waypoints = waypoints_data
     
     ########## Battery verification ##########
     def verify_battery(self):
@@ -367,7 +370,7 @@ class MAV2(Node):
         future = self.waypoint_pull_srv.call_async(self.waypoint_pull_req)
         while future.result() == None:
             rclpy.spin_once(self)
-        return self.waypoints_list.waypoints
+        return self.received_waypoints.waypoints
     
     def mission_get_current_waypoint(self):
         while not self.waypoint_pull_srv.wait_for_service(timeout_sec=5):
@@ -375,7 +378,7 @@ class MAV2(Node):
         future = self.waypoint_pull_srv.call_async(self.waypoint_pull_req)
         while future.result() == None:
             rclpy.spin_once(self)
-        return self.waypoints_list.current_seq
+        return self.received_waypoints.current_seq
     
     def mission_set_current_waypoint(self,wp_number):
         self.waypoint_set_req.wp_seq = wp_number
@@ -444,9 +447,6 @@ class MAV2(Node):
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
-    while rclpy.ok():
-        mav.takeoff(5)
-        mav.land()
     #mav.go_to_global(mav.global_pose.latitude + 0.000008, mav.global_pose.longitude + 0.000008, mav.global_altitude)
     #mav.get_logger().info("GPS coordinates: " + str(mav.global_pose.latitude) + " lat " + str(mav.global_pose.longitude) + " lon")
     #mav.go_to_local(0, 0, 5, vel_xy=1)
@@ -454,6 +454,8 @@ if __name__ == '__main__':
     #mav.change_auto_speed(0.1)
     #mav.land()
     #mav.verify_battery()
+    mav.change_auto_speed(12)
+    mav.mission_infinite_loop()
    
 
     

@@ -38,7 +38,7 @@ class MAV2():
 
         ############# Services ##################
 
-        self.arm = rospy.ServiceProxy('/mavros/cmd/arming', CommandBool)
+        self.arm_srv = rospy.ServiceProxy('/mavros/cmd/arming', CommandBool)
         self.set_mode_srv = rospy.ServiceProxy('mavros/set_mode', SetMode)
         self.param_set_srv = rospy.ServiceProxy('/mavros/param/set', ParamSet)
      
@@ -56,6 +56,7 @@ class MAV2():
 
         service_timeout = 15
         try:
+            rospy.wait_for_message('/mavros/extended_state', ExtendedState)
             rospy.wait_for_service('mavros/param/get', service_timeout)
             rospy.wait_for_service('mavros/cmd/arming', service_timeout)
             rospy.wait_for_service('mavros/set_mode', service_timeout)
@@ -136,29 +137,28 @@ class MAV2():
         self.set_param(name_speed, speed)
         
 
-        if self.drone_extended_state.landed_state != 1 and self.drone_extended_state.landed_state != 0:
-            print(self.drone_extended_state.landed_state)
+        if self.drone_extended_state.landed_state != 1:
             rospy.logerr("Drone is not grounded! Takeoff cancelled")
             return
         self.arm()
         self.set_mode("AUTO.TAKEOFF")
-        
         #safety measures: locks program while taking off
         if safety_on:
             while self.drone_extended_state.landed_state != 3:
-                pass
+                self.rate.sleep()
             while self.drone_extended_state.landed_state == 3:
-                pass
-        self.get_logger().info("Takeoff completed!")
+                self.rate.sleep()
+                
+        rospy.loginfo("Takeoff completed!")
 
     def hold(self, hold_time): # hold time in seconds
-        init = now = self.get_clock().now()
-        now = self.get_clock().now()
-        time = rclpy.duration.Duration(seconds=hold_time, nanoseconds=0)
-        self.get_logger().info("Goind on hold for " + str(hold_time) + " s")
-        while (now - init).nanoseconds < hold_time*10**9:
-            self.set_position(self.drone_pose.pose.position.x, self.drone_pose.pose.position.y, self.drone_pose.pose.position.z)
-            now = self.get_clock().now()
+        x_init = self.drone_pose.pose.position.x
+        y_init = self.drone_pose.pose.position.y
+        z_init = self.drone_pose.pose.position.z
+        now = rospy.get_rostime()
+        rospy.loginfo("Goind on hold for " + str(hold_time) + " s")
+        while not rospy.get_rostime() - now > rospy.Duration(secs=hold_time):
+            self.set_position(x_init, y_init, z_init)
     
     ####### Goal Position and Velocity #########
     def set_position(self, x, y, z, yaw = None):
@@ -197,31 +197,7 @@ class MAV2():
             self.set_position(goal_x, goal_y, goal_z, yaw)
         self.get_logger().info("Arrived at requested position")
 
-    def go_to_global(self, lat, lon, alt,yaw=0, vel_xy = None, vel_z = None, GLOBAL_TOL = 0.2):
-        self.get_logger().info("Going to latitude " + str(lat) + ", longitude " + str(lon) + " and altitude: " + str(alt))
-        self.gps_target.pose.position.latitude = lat
-        self.gps_target.pose.position.longitude = lon
-        self.gps_target.pose.position.altitude = alt
-        time_stamp = Clock().now()
-        self.gps_target.header.stamp = time_stamp.to_msg()
-        goal = [lat, lon]
-        actual_global_pose = [self.global_pose.latitude, self.global_pose.longitude]
-        dist = self.global_dist(goal, actual_global_pose)
-        self.get_logger().info("Distance: " + str(dist))
-        if dist > 550:
-            self.get_logger().warn("Distance too far! Trajectory cancelled...")
-            return
-        self.change_auto_speed(vel_xy, vel_z)
-        while self.drone_state.mode != "OFFBOARD":
-                self.global_position_pub.publish(self.gps_target)
-                self.set_mode("OFFBOARD")
-        while dist >= GLOBAL_TOL:
-            self.global_position_pub.publish(self.gps_target)
-            actual_global_pose = [self.global_pose.latitude, self.global_pose.longitude]
-            dist = self.global_dist(goal, actual_global_pose)
-            rclpy.spin_once(self)
-        self.get_logger().info("Arrived at latitude: " + str(self.global_pose.latitude)+ " longitude: " + str(self.global_pose.longitude))
-
+    
     def change_auto_speed(self, vel_xy = None, vel_z = None):
         if vel_xy != None:
             vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=float(vel_xy), type=ParameterType.PARAMETER_DOUBLE))
@@ -260,22 +236,21 @@ class MAV2():
 
 
     def land(self, auto_disarm=True, speed=0.7, safety_on=True):
-        self.get_logger().info("Landing...")
-        rclpy.spin_once(self)
+        rospy.loginfo("Landing...")
+        name_vel_z = 'MPC_Z_VEL_ALL'
+        self.set_param(name_vel_z, -3.0)
 
-        vel_z_general_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=-3.0, type=ParameterType.PARAMETER_DOUBLE))
-        self.set_param(vel_z_general_param_value)
-        land_speed_param_value= Parameter(name= 'MPC_LAND_SPEED', value=ParameterValue(double_value= float(speed), type=ParameterType.PARAMETER_DOUBLE))
-        self.set_param(land_speed_param_value)
+        name_speed = 'MPC_LAND_SPEED'
+        self.set_param(name_speed, speed)
 
         self.set_mode('AUTO.LAND')
 
         if safety_on:
             while self.drone_extended_state.landed_state != 4:
-                rclpy.spin_once(self)
+                self.rate.sleep()
             while self.drone_extended_state.landed_state == 4:
-                rclpy.spin_once(self)
-        self.get_logger().info("Landing completed!")
+                self.rate.sleep()
+        rospy.loginfo("Landing completed!")
 
         if auto_disarm:
             self.disarm()
@@ -283,120 +258,36 @@ class MAV2():
     ########## Arm #######
 
     def arm(self):
-        self.get_logger().warn('ARMING MAV')
-        self.arm_req.value = True
-        while not self.arm_srv.wait_for_service(timeout_sec=5):
-            self.get_logger().info('Arm/Disarm service not available, waiting again...')
-        self.arm_srv.call_async(self.arm_req)
-        self.get_logger().warn('Drone is armed')
+        service_timeout = 15
+        rospy.loginfo('ARMING MAV') 
+        rospy.wait_for_service('mavros/cmd/arming', service_timeout)
+        self.arm_srv(True)
+        while not self.drone_state.armed:
+            self.arm_srv(True)
+        rospy.loginfo('Drone is armed')
         
 
     ########## Disarm #######
     def disarm(self):
-        self.get_logger().warn('DISARMING MAV')
-        self.arm_req.value = False
-        while not self.arm_srv.wait_for_service(timeout_sec=5):
-            self.get_logger().info('Arm/Disarm service not available, waiting again...')
-        self.arm_srv.call_async(self.arm_req)
-        self.get_logger().warn('Drone is disarmed')
-  
+        service_timeout = 15
+        rospy.loginfo('DISARMING MAV')
+        rospy.wait_for_service('mavros/cmd/arming', service_timeout)
+        self.arm_srv(False)
+        while not self.drone_state.armed:
+            self.arm_srv(False)
+        rospy.loginfo('Drone is disarmed')
 
-    ############ Mission Functions ############
-    def mission_start(self):
-        self.arm()
-        self.get_logger().info('STARTING MISSION MODE')
-        self.set_mode("AUTO.MISSION")
-    
-    def mission_pause(self):
-        self.get_logger().info('PAUSING MISSION MODE')
-        self.set_mode("AUTO.LOITER")
-
-    def mission_get_waypoints_list(self):
-        while not self.waypoint_pull_srv.wait_for_service(timeout_sec=5):
-            self.get_logger().info('Waypoint pull service not available, waiting again...')
-        future = self.waypoint_pull_srv.call_async(self.waypoint_pull_req)
-        while future.result() == None:
-            rclpy.spin_once(self)
-        return self.received_waypoints.waypoints
-    
-    def mission_get_current_waypoint(self):
-        while not self.waypoint_pull_srv.wait_for_service(timeout_sec=5):
-            self.get_logger().info('Waypoint pull service not available, waiting again...')
-        future = self.waypoint_pull_srv.call_async(self.waypoint_pull_req)
-        while future.result() == None:
-            rclpy.spin_once(self)
-        return self.received_waypoints.current_seq
-    
-    def mission_set_current_waypoint(self,wp_number):
-        self.waypoint_set_req.wp_seq = wp_number
-        while not self.waypoint_set_srv.wait_for_service(timeout_sec=5):
-            self.get_logger().info('Waypoint set service not available, waiting again...')
-        future = self.waypoint_set_srv.call_async(self.waypoint_set_req)
-        while future.result() == None:
-            rclpy.spin_once(self)
-        return future.result().success
-    
-    def mission_infinite_loop(self): #WARNING THIS IS AN INFINITE LOOP, SHOULD BE USED FOR DEBUG ONLY!
-        self.get_logger().error('INFINITE MISSION MODE, KILL THE PROGRAM TO EXIT')
-        self.mission_start()
-        while rclpy.ok():
-            if self.mission_get_current_waypoint() == len(self.mission_get_waypoints_list())-1:
-                print("setting waypoint 0")
-                self.mission_set_current_waypoint(0)
-                
-    ############ Additional functions #############
-    def geoid_height(self, lat, lon):
-        return self._egm96.height(lat, lon)
-
-    def global_dist(self, coord1 , coord2):  # distance from 2 gps coordinates using Haversine function
-        #coord1 = [lat, long]
-        lat1,lon1=coord1
-        lat2,lon2=coord2
-
-        R=6371000                               # radius of Earth in meters
-        phi_1=math.radians(lat1)
-        phi_2=math.radians(lat2)
-
-        delta_phi=math.radians(lat2-lat1)
-        delta_lambda=math.radians(lon2-lon1)
-
-        a=math.sin(delta_phi/2.0)**2+\
-        math.cos(phi_1)*math.cos(phi_2)*\
-        math.sin(delta_lambda/2.0)**2
-        c=2*math.atan2(math.sqrt(a),math.sqrt(1-a))
-        
-        return R*c                             # output distance in meters
-    
-    ############# Centralization Functions #############
-    def camera_pid(self, delta_x, delta_y, delta_area):
-        self.TARGET = (int(self.cam.shape[0]/2), int(self.cam.shape[1]/2))
-        self.TOL = 0.0140
-        self.PID = 1/2000
-        self.PID_area = 1/500000
-
-        # Centralization PID
-        vel_x = delta_y * self.PID
-        vel_y = delta_x * self.PID
-        vel_z = delta_area * self.PID_area
-
-        # Set PID tolerances
-        if abs(vel_x) < self.TOL:
-            vel_x = 0.0
-        if abs(vel_y) < self.TOL:
-            vel_y = 0.0
-        if abs(vel_z) < self.TOL:
-            vel_z = 0.0
-        
-        # Set drone instant velocity
-        self.set_vel(vel_x, vel_y, vel_z)
-        self.get_logger().info(f"Set_vel -> x: {vel_x} y: {vel_y} z: {vel_z}")
 
 if __name__ == '__main__':
     rospy.init_node('mavbase2')
     mav = MAV2()
     #mav.set_mode("AUTO.LAND")
     #mav.set_param("MIS_TAKEOFF_ALT", 2)
-    mav.takeoff(2)
 
+    mav.takeoff(3)
+    mav.hold(10)
+    #mav.land()
+
+  
 
     

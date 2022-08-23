@@ -1,120 +1,83 @@
 #!/usr/bin/env python3
 
+from ast import Pass
 from tkinter import SEL
 from turtle import position
-import rclpy
-from mavros_msgs import srv
-from mavros_msgs.srv import SetMode, CommandBool, WaypointPull, WaypointSetCurrent
-from mavros_msgs.msg import State, ExtendedState, PositionTarget, WaypointList
-from rcl_interfaces.msg import ParameterType, Parameter, ParameterValue
-from rcl_interfaces.srv import SetParameters
+import rospy
+from mavros_msgs.srv import SetMode, CommandBool, WaypointPull, WaypointSetCurrent, ParamSet
+from mavros_msgs.msg import State, ExtendedState, PositionTarget, ParamValue
+
 from geometry_msgs.msg import PoseStamped, TwistStamped
-from geographic_msgs.msg import GeoPoseStamped
 from sensor_msgs.msg import BatteryState, NavSatFix, Image
-from std_msgs.msg import String
-from rclpy.node import Node
-from rclpy import qos
-from rclpy.clock import Clock
-from action_py.setPosition_action_client import SetPositionActionClient
-from action_py.setPosition_action_server import SetPositionActionServer
 import numpy as np
 import math
 import sys
 from cv_bridge import CvBridge 
 from tf_transformations import quaternion_from_euler, euler_from_quaternion
-from pygeodesy.geoids import GeoidPGM
 
-from mavbase2.action import SetPosition 
 
 DEBUG = False
 
-class MAV2(Node):
+class MAV2():
 
     def __init__(self):
-        super().__init__('mav')
-
         ############ Attributes #################
 
-        self.rate = self.create_rate(60)
-        self.desired_state = ""
+        self.rate = rospy.Rate(60)
         self.drone_state = State()
         self.goal_pose = PoseStamped()
         self.drone_pose = PoseStamped()
-        self.pose_target = PositionTarget()
         self.goal_vel = TwistStamped()
         self.drone_state = State()
         self.drone_extended_state = ExtendedState()
         self.battery = BatteryState()
         self.global_pose = NavSatFix()
-        self.gps_target = GeoPoseStamped()
         self.cam = Image()
         self.bridge_object = CvBridge()
         self.camera_topic = "/camera/image_raw"
-        self._egm96 = GeoidPGM('/usr/share/GeographicLib/geoids/egm96-5.pgm', kind=-3)
 
         ############# Services ##################
 
-        self.set_mode_srv = self.create_client(SetMode, '/mavros/set_mode')
-
-        self.arm_srv = self.create_client(CommandBool, '/mavros/cmd/arming')
-
-        self.param_set_srv = self.create_client(SetParameters,'/mavros/param/set_parameters')
-
-        self.waypoint_pull_srv = self.create_client(WaypointPull,"/mavros/mission/pull")
-
-        self.waypoint_set_srv = self.create_client(WaypointSetCurrent,"/mavros/mission/set_current")
-        
-        ############## Action Server ##################
-        self.setPosition_action_server = SetPositionActionServer()
-        
-        ############# Action Clients ###################
-        self._setposition_action_client = SetPositionActionClient()
-
+        self.arm = rospy.ServiceProxy('/mavros/cmd/arming', CommandBool)
+        self.set_mode_srv = rospy.ServiceProxy('mavros/set_mode', SetMode)
+        self.param_set_srv = rospy.ServiceProxy('/mavros/param/set', ParamSet)
+     
         ############### Publishers ##############
-
-        self.local_position_pub = self.create_publisher(PoseStamped, '/mavros/setpoint_position/local', 20)
-        self.velocity_pub = self.create_publisher(TwistStamped,  '/mavros/setpoint_velocity/cmd_vel', 5)
-        self.target_pub = self.create_publisher(PositionTarget, '/mavros/setpoint_raw/local', 5)
-        self.global_position_pub = self.create_publisher(GeoPoseStamped, '/mavros/setpoint_position/global', 20)
+        self.local_position_pub = rospy.Publisher('/mavros/setpoint_position/local', PoseStamped, queue_size = 20)
+        self.velocity_pub = rospy.Publisher('/mavros/setpoint_velocity/cmd_vel',  TwistStamped, queue_size=5)
+        self.target_pub = rospy.Publisher('/mavros/setpoint_raw/local', PositionTarget, queue_size=5)
 
         ########## Subscribers ##################
-
-        self.local_atual = self.create_subscription(PoseStamped, '/mavros/local_position/pose', self.local_callback, qos.qos_profile_sensor_data)
-        self.state_sub =  self.create_subscription(State, '/mavros/state', self.state_callback, qos.qos_profile_sensor_data)
-        self.extended_state_sub =  self.create_subscription(ExtendedState, '/mavros/extended_state', self.extended_state_callback, qos.qos_profile_sensor_data)
-        self.battery_sub =  self.create_subscription(BatteryState, '/mavros/battery', self.battery_callback, qos.qos_profile_sensor_data)
-        self.global_position_sub =  self.create_subscription(NavSatFix,'/mavros/global_position/global' , self.global_callback, qos.qos_profile_sensor_data)
-        self.cam_sub = self.create_subscription(Image, self.camera_topic, self.cam_callback, qos.qos_profile_sensor_data)
-        self.waypoints_sub =self.create_subscription(WaypointList, '/mavros/mission/waypoints', self.waypoints_callback, qos.qos_profile_sensor_data)
+        self.local_atual = rospy.Subscriber('/mavros/local_position/pose', PoseStamped, self.local_callback)
+        self.state_sub = rospy.Subscriber('/mavros/state', State, self.state_callback, queue_size=10) 
+        self.battery_sub = rospy.Subscriber('/mavros/battery', BatteryState, self.battery_callback)
+        self.extended_state_sub = rospy.Subscriber('/mavros/extended_state', ExtendedState, self.extended_state_callback, queue_size=2)        
+        self.cam_sub = rospy.Subscriber(self.camera_topic, Image, self.cam_callback, queue_size=2)        
 
         service_timeout = 15
-        while not self.set_mode_srv.wait_for_service(timeout_sec=service_timeout):
-            self.get_logger().info('Set mode service not available, waiting again...')
-        while not self.arm_srv.wait_for_service(timeout_sec=service_timeout):
-            self.get_logger().info('Arm service not available, waiting again...')
-        while not self.param_set_srv.wait_for_service(timeout_sec=service_timeout):
-            self.get_logger().info('Set param service not available, waiting again...')
+        try:
+            rospy.wait_for_service('mavros/param/get', service_timeout)
+            rospy.wait_for_service('mavros/cmd/arming', service_timeout)
+            rospy.wait_for_service('mavros/set_mode', service_timeout)
+            rospy.loginfo("ROS services are up")
+        except rospy.ROSException:
+            rospy.logerr("failed to connect to services")
 
-        self.arm_req = CommandBool.Request()
-        self.set_mode_req = SetMode.Request()
-        self.param_set_req = SetParameters.Request()
-        self.waypoint_pull_req = WaypointPull.Request()
-        self.waypoint_set_req = WaypointSetCurrent.Request()
-        self.get_logger().info("Services are up")
+        rospy.logerr("Services are up")
         
 
         while self.drone_state.mode == "":
-            rclpy.spin_once(self)
-        self.get_logger().info("Subscribers are up")
-        #self.future = self.NOMEDOSRV.call_async(self.req)
-
+            pass
+        rospy.logerr("Subscribers are up")
+       
     ########## Callback functions ###########
     
     def state_callback(self, state_data):
         self.drone_state = state_data
+        
     
-    def extended_state_callback(self, extended_state_data):
-        self.drone_extended_state = extended_state_data
+    def extended_state_callback(self, es_data):
+        self.drone_extended_state = es_data
         #Values for referente self.drone_extended_state.landed_state
         #uint8 LANDED_STATE_UNDEFINED = 0
         #uint8 LANDED_STATE_ON_GROUND = 1
@@ -125,64 +88,57 @@ class MAV2(Node):
     def battery_callback (self, battery_data):
         self.battery = battery_data
     
-    def local_callback(self, data):
-        self.drone_pose = data
-    
-    def global_callback(self, global_data):
-        self.global_pose = global_data
-        self.global_altitude = self.global_pose.altitude - self.geoid_height(self.global_pose.latitude, self.global_pose.longitude)    
+    def local_callback(self, local):
+        self.drone_pose.pose.position.x = local.pose.position.x
+        self.drone_pose.pose.position.y = local.pose.position.y
+        self.drone_pose.pose.position.z = local.pose.position.z
 
     def cam_callback(self, cam_data):
         self.cam = self.bridge_object.imgmsg_to_cv2(cam_data,"bgr8")
     
-    def waypoints_callback(self, waypoints_data):
-        self.received_waypoints = waypoints_data
     
     ########## Battery verification ##########
     def verify_battery(self):
         percentage = self.battery.percentage
-        self.get_logger().info("Waiting for battery topic...")
+        rospy.logerr("Waiting for battery topic...")
         while percentage == 0 and self.battery.voltage == 0:
-            rclpy.spin_once(self)
-        self.get_logger().info("Battery percentage is: " + str(percentage))
-        self.get_logger().info("Battery voltage is: " + str(self.battery.voltage))
+            pass
+        rospy.logerr("Battery percentage is: " + str(percentage))
+        rospy.logerr("Battery voltage is: " + str(self.battery.voltage))
 
 
     ###Set mode: PX4 mode - string, timeout (seconds) - int
     def set_mode(self, mode):
         #self.get_logger().info("setting FCU mode: {0}".format(mode))
-        self.set_mode_req.base_mode = 0
-        self.set_mode_req.custom_mode = mode
-        while not self.set_mode_srv.wait_for_service(timeout_sec=5):
-            self.get_logger().info('Set mode service not available, waiting again...')
-        future = self.set_mode_srv.call_async(self.set_mode_req)  # 0 is custom mode
-        while future.result() == None:
-            rclpy.spin_once(self)
-        if not future.result().mode_sent:
-            raise Exception("failed to send mode command")
+        service_timeout = 15
+        rospy.wait_for_service('mavros/set_mode', service_timeout)
+  
+        result = self.set_mode_srv(0, mode)
+        if not result.mode_sent:
+            rospy.logerr("failed to send mode command")
             
-    def set_param(self, param_value):
-        self.param_set_req.parameters = [param_value]
-        while not self.param_set_srv.wait_for_service(timeout_sec=5):
-            self.get_logger().info('Set param service not available, waiting again...')
-        self.param_set_srv.call_async(self.param_set_req)
-        rclpy.spin_once(self)
+    def set_param(self, param_name, param_value):
+        service_timeout = 15
+        rospy.wait_for_service('/mavros/param/set', service_timeout)
+        a = ParamValue()
+        a.real = param_value        
+        self.param_set_srv(param_name, a)
 
     def takeoff(self, height, speed=1.5, safety_on=True):
-        self.get_logger().info("Taking off...")
+    
+        name_alt= 'MIS_TAKEOFF_ALT'
+        self.set_param(name_alt, height)
+        
+        name_vel_z = 'MPC_Z_VEL_ALL'
+        self.set_param(name_vel_z, -3)
 
-        alt_param_value = Parameter(name= 'MIS_TAKEOFF_ALT', value=ParameterValue(double_value=float(height), type=ParameterType.PARAMETER_DOUBLE))
-        self.set_param(alt_param_value)
+        name_speed = 'MPC_TKO_SPEED'
+        self.set_param(name_speed, speed)
         
-        vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=-3.0, type=ParameterType.PARAMETER_DOUBLE))
-        self.set_param(vel_z_param_value)
-        speed_param_value = Parameter(name= 'MPC_TKO_SPEED', value=ParameterValue(double_value=float(speed), type=ParameterType.PARAMETER_DOUBLE))
-        self.set_param(speed_param_value)
-        
-        rclpy.spin_once(self)
-        if self.drone_extended_state.landed_state != 1:
+
+        if self.drone_extended_state.landed_state != 1 and self.drone_extended_state.landed_state != 0:
             print(self.drone_extended_state.landed_state)
-            self.get_logger().error("Drone is not grounded! Takeoff cancelled")
+            rospy.logerr("Drone is not grounded! Takeoff cancelled")
             return
         self.arm()
         self.set_mode("AUTO.TAKEOFF")
@@ -190,9 +146,9 @@ class MAV2(Node):
         #safety measures: locks program while taking off
         if safety_on:
             while self.drone_extended_state.landed_state != 3:
-                rclpy.spin_once(self)
+                pass
             while self.drone_extended_state.landed_state == 3:
-                rclpy.spin_once(self)
+                pass
         self.get_logger().info("Takeoff completed!")
 
     def hold(self, hold_time): # hold time in seconds
@@ -343,16 +299,7 @@ class MAV2(Node):
             self.get_logger().info('Arm/Disarm service not available, waiting again...')
         self.arm_srv.call_async(self.arm_req)
         self.get_logger().warn('Drone is disarmed')
-        #if self.drone_pose.pose.position.z < TOL:
-        #    for i in range(3):
-                #self.arm_srv.call_async(self.arm_req)
-        #        if DEBUG:
-        #            self.get_logger().info('Drone height' + str(self.drone_pose.pose.position.z))
-        #
-        #else:
-        #    self.get_logger().warn('Altitude too high for disarming!')
-        #    self.land()
-        #    self.arm_srv.call_async(self.arm_req)
+  
 
     ############ Mission Functions ############
     def mission_start(self):
@@ -445,17 +392,11 @@ class MAV2(Node):
         self.get_logger().info(f"Set_vel -> x: {vel_x} y: {vel_y} z: {vel_z}")
 
 if __name__ == '__main__':
-    rclpy.init(args=sys.argv)
+    rospy.init_node('mavbase2')
     mav = MAV2()
-    #mav.go_to_global(mav.global_pose.latitude + 0.000008, mav.global_pose.longitude + 0.000008, mav.global_altitude)
-    #mav.get_logger().info("GPS coordinates: " + str(mav.global_pose.latitude) + " lat " + str(mav.global_pose.longitude) + " lon")
-    #mav.go_to_local(0, 0, 5, vel_xy=1)
-    #mav.go_to_global(47.3977422, 8.5456861, mav.global_altitude, vel_xy=10)
-    #mav.change_auto_speed(0.1)
-    #mav.land()
-    #mav.verify_battery()
-    mav.change_auto_speed(12)
-    mav.mission_infinite_loop()
-   
+    #mav.set_mode("AUTO.LAND")
+    #mav.set_param("MIS_TAKEOFF_ALT", 2)
+    mav.takeoff(2)
+
 
     

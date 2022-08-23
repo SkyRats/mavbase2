@@ -1,5 +1,0 @@
-float32[] position_request
----
-float32[] position_result
----
-float32[] partial_position

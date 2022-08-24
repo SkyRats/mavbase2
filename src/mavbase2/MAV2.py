@@ -13,7 +13,7 @@ import numpy as np
 import math
 import sys
 from cv_bridge import CvBridge 
-from tf_transformations import quaternion_from_euler, euler_from_quaternion
+from tf.transformations import quaternion_from_euler, euler_from_quaternion
 
 
 DEBUG = False
@@ -180,7 +180,7 @@ class MAV2():
 
     
     def go_to_local(self, goal_x, goal_y, goal_z, yaw = None, TOL=0.2):
-        self.get_logger().info("Going towards local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + "), with a yaw angle of: " + str(yaw))
+        rospy.loginfo("Going towards local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + "), with a yaw angle of: " + str(yaw))
         current_x = self.drone_pose.pose.position.x
         current_y = self.drone_pose.pose.position.y
         current_z = self.drone_pose.pose.position.z
@@ -188,33 +188,31 @@ class MAV2():
         if yaw == None:
             yaw = current_yaw
         while(np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2) + (current_yaw - yaw)**2) > TOL:
-            rclpy.spin_once(self)
             current_x = self.drone_pose.pose.position.x
             current_y = self.drone_pose.pose.position.y
             current_z = self.drone_pose.pose.position.z
             [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
             self.set_position(goal_x, goal_y, goal_z, yaw)
-        self.get_logger().info("Arrived at requested position")
+        rospy.loginfo("Arrived at requested position")
 
     
     def change_auto_speed(self, vel_xy = None, vel_z = None):
         if vel_xy != None:
-            vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=float(vel_xy), type=ParameterType.PARAMETER_DOUBLE))
-            self.set_param(vel_xy_param_value)
-            self.get_logger().info("Horizontal velocity parameter set to " +str(vel_xy))
+            name_vel_xy = 'MPC_XY_VEL_MAX'
+            self.set_param(name_vel_xy, vel_xy)
+            rospy.loginfo("Horizontal velocity parameter set to " +str(vel_xy))
         else:
-            vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=12.0, type=ParameterType.PARAMETER_DOUBLE))
-            self.set_param(vel_xy_param_value)
-            self.get_logger().info("Horizontal velocity parameter set to default")
+            name_xy_max = 'MPC_XY_VEL_MAX'
+            self.set_param(name_xy_max,12.0)
+            rospy.loginfo("Horizontal velocity parameter set to default")
         if vel_z != None:
-           vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=float(vel_z), type=ParameterType.PARAMETER_DOUBLE))
-           self.set_param(vel_z_param_value)
-           self.get_logger().info("Vertical velocity parameter set to " +str(vel_z))
+            name_vel_z = 'MPC_Z_VEL_ALL'
+            self.set_param(name_vel_z, vel_z)
+            rospy.loginfo("Vertical velocity parameter set to " +str(vel_z))
         else:
-           vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=-3.0, type=ParameterType.PARAMETER_DOUBLE))
-           self.set_param(vel_z_param_value)
-           self.get_logger().info("Vertical velocity parameter set to default")
-        rclpy.spin_once(self)
+            name_z_max = 'MPC_Z_VEL_ALL'
+            self.set_param(name_z_max, -3.0)
+            rospy.loginfo("Vertical velocity parameter set to default")
 
     def set_vel(self, x, y, z, yaw = 0):
         while self.drone_state.mode != "OFFBOARD":
@@ -282,10 +280,10 @@ if __name__ == '__main__':
     mav = MAV2()
     #mav.set_mode("AUTO.LAND")
     #mav.set_param("MIS_TAKEOFF_ALT", 2)
-
+    mav.change_auto_speed(vel_xy = 2, vel_z = 1.5)
     mav.takeoff(3)
-    mav.hold(10)
-    #mav.land()
+    mav.go_to_local(5,5,3)
+    mav.land()
 
   
 

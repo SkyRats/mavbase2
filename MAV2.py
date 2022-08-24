@@ -223,7 +223,7 @@ class MAV2(Node):
         self.local_position_pub.publish(self.goal_pose)
 
     
-    def go_to_local(self, goal_x, goal_y, goal_z, yaw = None, vel_xy = None, vel_z = None, TOL=0.2):
+    def go_to_local(self, goal_x, goal_y, goal_z, yaw = None, TOL=0.2):
         self.get_logger().info("Going towards local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + "), with a yaw angle of: " + str(yaw))
         current_x = self.drone_pose.pose.position.x
         current_y = self.drone_pose.pose.position.y
@@ -231,7 +231,6 @@ class MAV2(Node):
         [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
         if yaw == None:
             yaw = current_yaw
-        self.change_auto_speed(vel_xy, vel_z)
         while(np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2) + (current_yaw - yaw)**2) > TOL:
             rclpy.spin_once(self)
             current_x = self.drone_pose.pose.position.x
@@ -241,7 +240,7 @@ class MAV2(Node):
             self.set_position(goal_x, goal_y, goal_z, yaw)
         self.get_logger().info("Arrived at requested position")
 
-    def go_to_global(self, lat, lon, alt,yaw=0, vel_xy = None, vel_z = None, GLOBAL_TOL = 0.2):
+    def go_to_global(self, lat, lon, alt,yaw=0, , GLOBAL_TOL = 0.2):
         self.get_logger().info("Going to latitude " + str(lat) + ", longitude " + str(lon) + " and altitude: " + str(alt))
         self.gps_target.pose.position.latitude = lat
         self.gps_target.pose.position.longitude = lon
@@ -255,7 +254,6 @@ class MAV2(Node):
         if dist > 550:
             self.get_logger().warn("Distance too far! Trajectory cancelled...")
             return
-        self.change_auto_speed(vel_xy, vel_z)
         while self.drone_state.mode != "OFFBOARD":
                 self.global_position_pub.publish(self.gps_target)
                 self.set_mode("OFFBOARD")
@@ -454,8 +452,6 @@ if __name__ == '__main__':
     #mav.change_auto_speed(0.1)
     #mav.land()
     #mav.verify_battery()
-    mav.change_auto_speed(12)
-    mav.mission_infinite_loop()
    
 
     

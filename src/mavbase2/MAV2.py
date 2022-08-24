@@ -179,7 +179,7 @@ class MAV2():
         self.local_position_pub.publish(self.goal_pose)
 
     
-    def go_to_local(self, goal_x, goal_y, goal_z, yaw = None, vel_xy = None, vel_z = None, TOL=0.2):
+    def go_to_local(self, goal_x, goal_y, goal_z, yaw = None, TOL=0.2):
         self.get_logger().info("Going towards local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + "), with a yaw angle of: " + str(yaw))
         current_x = self.drone_pose.pose.position.x
         current_y = self.drone_pose.pose.position.y
@@ -187,7 +187,6 @@ class MAV2():
         [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
         if yaw == None:
             yaw = current_yaw
-        self.change_auto_speed(vel_xy, vel_z)
         while(np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2) + (current_yaw - yaw)**2) > TOL:
             rclpy.spin_once(self)
             current_x = self.drone_pose.pose.position.x

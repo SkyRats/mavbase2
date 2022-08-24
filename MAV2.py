@@ -240,7 +240,7 @@ class MAV2(Node):
             self.set_position(goal_x, goal_y, goal_z, yaw)
         self.get_logger().info("Arrived at requested position")
 
-    def go_to_global(self, lat, lon, alt,yaw=0, , GLOBAL_TOL = 0.2):
+    def go_to_global(self, lat, lon, alt,yaw=0,  GLOBAL_TOL = 0.2):
         self.get_logger().info("Going to latitude " + str(lat) + ", longitude " + str(lon) + " and altitude: " + str(alt))
         self.gps_target.pose.position.latitude = lat
         self.gps_target.pose.position.longitude = lon

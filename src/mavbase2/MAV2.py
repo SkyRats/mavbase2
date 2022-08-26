@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
 from ast import Pass
+from cmath import nan
 from tkinter import SEL
 from turtle import position
 import rospy
-from mavros_msgs.srv import SetMode, CommandBool, WaypointPull, WaypointSetCurrent, ParamSet
+from mavros_msgs.srv import SetMode, CommandBool, CommandTOL, ParamSet
 from mavros_msgs.msg import State, ExtendedState, PositionTarget, ParamValue
 
 from geometry_msgs.msg import PoseStamped, TwistStamped
@@ -14,7 +15,7 @@ import math
 import sys
 from cv_bridge import CvBridge 
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
-
+import math
 
 DEBUG = False
 
@@ -41,7 +42,10 @@ class MAV2():
         self.arm_srv = rospy.ServiceProxy('/mavros/cmd/arming', CommandBool)
         self.set_mode_srv = rospy.ServiceProxy('mavros/set_mode', SetMode)
         self.param_set_srv = rospy.ServiceProxy('/mavros/param/set', ParamSet)
-     
+        self.takeoff_srv = rospy.ServiceProxy('/mavros_msgs/CommandTOL', CommandTOL)
+   
+
+    
         ############### Publishers ##############
         self.local_position_pub = rospy.Publisher('/mavros/setpoint_position/local', PoseStamped, queue_size = 20)
         self.velocity_pub = rospy.Publisher('/mavros/setpoint_velocity/cmd_vel',  TwistStamped, queue_size=5)
@@ -110,13 +114,11 @@ class MAV2():
 
     ###Set mode: PX4 mode - string, timeout (seconds) - int
     def set_mode(self, mode):
-        #self.get_logger().info("setting FCU mode: {0}".format(mode))
+        rospy.loginfo("setting FCU mode: {0}".format(mode))
         service_timeout = 15
         rospy.wait_for_service('mavros/set_mode', service_timeout)
-  
-        result = self.set_mode_srv(0, mode)
-        if not result.mode_sent:
-            rospy.logerr("failed to send mode command")
+        while (self.drone_state.mode != mode ):        
+            self.set_mode_srv(0, mode)
             
     def set_param(self, param_name, param_value):
         service_timeout = 15
@@ -125,13 +127,23 @@ class MAV2():
         a.real = param_value        
         self.param_set_srv(param_name, a)
 
-    def takeoff(self, height, speed=1.5, safety_on=True):
+    def takeoff(self, height):
+ 
+        self.arm()
+        
+        rospy.loginfo("Takeoff")
+
+        self.go_to_local(0,0,height)
+
+
+
+    '''def takeoff(self, height, speed=1.5, safety_on=True):
     
         name_alt= 'MIS_TAKEOFF_ALT'
-        self.set_param(name_alt, height)
+        self.set_param(name_alt, float(height))
         
         name_vel_z = 'MPC_Z_VEL_ALL'
-        self.set_param(name_vel_z, -3)
+        self.set_param(name_vel_z, -3.0)
 
         name_speed = 'MPC_TKO_SPEED'
         self.set_param(name_speed, speed)
@@ -141,15 +153,19 @@ class MAV2():
             rospy.logerr("Drone is not grounded! Takeoff cancelled")
             return
         self.arm()
+        self.takeoff_srv(1.0,0.0, float(math.nan), float(math.nan), 5.0) 
+
         self.set_mode("AUTO.TAKEOFF")
-        #safety measures: locks program while taking off
+        
         if safety_on:
-            while self.drone_extended_state.landed_state != 3:
-                self.rate.sleep()
-            while self.drone_extended_state.landed_state == 3:
-                self.rate.sleep()
-                
-        rospy.loginfo("Takeoff completed!")
+            while self.drone_state.mode != "AUTO.TAKEOFF":
+                pass
+            while self.drone_state.mode == "AUTO.TAKEOFF":
+                pass
+        rospy.loginfo("Takeoff completed!")'''
+
+
+
 
     def hold(self, hold_time): # hold time in seconds
         x_init = self.drone_pose.pose.position.x
@@ -280,9 +296,9 @@ if __name__ == '__main__':
     mav = MAV2()
     #mav.set_mode("AUTO.LAND")
     #mav.set_param("MIS_TAKEOFF_ALT", 2)
-    mav.change_auto_speed(vel_xy = 2, vel_z = 1.5)
-    mav.takeoff(3)
-    mav.go_to_local(5,5,3)
+    #mav.change_auto_speed(vel_xy = 2, vel_z = 1.5)
+    mav.takeoff(2)
+    #mav.go_to_local(5,5,3)
     mav.land()
 
   

@@ -11,8 +11,7 @@ from mavros_msgs.msg import State, ExtendedState, PositionTarget, ParamValue
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from sensor_msgs.msg import BatteryState, NavSatFix, Image
 import numpy as np
-import math
-import sys
+
 from cv_bridge import CvBridge 
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
 import math
@@ -93,10 +92,8 @@ class MAV2():
     def battery_callback (self, battery_data):
         self.battery = battery_data
     
-    def local_callback(self, local):
-        self.drone_pose.pose.position.x = local.pose.position.x
-        self.drone_pose.pose.position.y = local.pose.position.y
-        self.drone_pose.pose.position.z = local.pose.position.z
+    def local_callback(self, data):
+        self.drone_pose = data
 
     def cam_callback(self, cam_data):
         self.cam = self.bridge_object.imgmsg_to_cv2(cam_data,"bgr8")
@@ -127,7 +124,7 @@ class MAV2():
         a.real = param_value        
         self.param_set_srv(param_name, a)
 
-    def takeoff(self, height):
+    '''def takeoff(self, height):
  
         self.arm()
         
@@ -137,7 +134,8 @@ class MAV2():
 
 
 
-    '''def takeoff(self, height, speed=1.5, safety_on=True):
+    '''
+    def takeoff(self, height, speed=1.5, safety_on=True):
     
         name_alt= 'MIS_TAKEOFF_ALT'
         self.set_param(name_alt, float(height))
@@ -149,12 +147,11 @@ class MAV2():
         self.set_param(name_speed, speed)
         
 
-        if self.drone_extended_state.landed_state != 1:
-            rospy.logerr("Drone is not grounded! Takeoff cancelled")
-            return
+        #if self.drone_extended_state.landed_state != 1:
+        #    rospy.logerr("Drone is not grounded! Takeoff cancelled")
+        #    return
         self.arm()
-        self.takeoff_srv(1.0,0.0, float(math.nan), float(math.nan), 5.0) 
-
+        
         self.set_mode("AUTO.TAKEOFF")
         
         if safety_on:
@@ -162,7 +159,7 @@ class MAV2():
                 pass
             while self.drone_state.mode == "AUTO.TAKEOFF":
                 pass
-        rospy.loginfo("Takeoff completed!")'''
+        rospy.loginfo("Takeoff completed!")
 
 
 
@@ -188,6 +185,7 @@ class MAV2():
             self.goal_pose.pose.orientation.y, 
             self.goal_pose.pose.orientation.z,
             self.goal_pose.pose.orientation.w] = quaternion_from_euler(0,0,yaw) #roll,pitch,yaw
+            #print("X: " + str(self.goal_pose)))
 
         while self.drone_state.mode != "OFFBOARD":
             self.local_position_pub.publish(self.goal_pose)
@@ -203,12 +201,23 @@ class MAV2():
         [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
         if yaw == None:
             yaw = current_yaw
-        while(np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2) + (current_yaw - yaw)**2) > TOL:
+        
+        if yaw*current_yaw >= 0:
+            yaw_diff = yaw - current_yaw
+        else:
+            yaw_diff = yaw + current_yaw
+        while not rospy.is_shutdown() and (np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2) + (yaw_diff)**2) > TOL:
             current_x = self.drone_pose.pose.position.x
             current_y = self.drone_pose.pose.position.y
             current_z = self.drone_pose.pose.position.z
             [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
             self.set_position(goal_x, goal_y, goal_z, yaw)
+            if yaw*current_yaw >= 0:
+                yaw_diff = yaw - current_yaw
+            else:
+                yaw_diff = yaw + current_yaw
+            if yaw_diff > 3:
+                print("deu merda familia")
         rospy.loginfo("Arrived at requested position")
 
     
@@ -298,7 +307,18 @@ if __name__ == '__main__':
     #mav.set_param("MIS_TAKEOFF_ALT", 2)
     #mav.change_auto_speed(vel_xy = 2, vel_z = 1.5)
     mav.takeoff(2)
-    #mav.go_to_local(5,5,3)
+    #mav.go_to_local(0,0,3, yaw = -1.5708)
+    #mav.go_to_local(5,0,3)
+    #mav.go_to_local(0,0,3, yaw = 0)
+    #mav.go_to_local(5,0,3)
+    mav.go_to_local(0,0,3, yaw = 1.5708)
+    mav.go_to_local(5,0,3)
+    mav.go_to_local(0,0,3, yaw = 3.14)
+    mav.go_to_local(5,0,3)
+    mav.go_to_local(0,0,3, yaw = -3.14)
+    mav.go_to_local(5,0,3)
+
+
     mav.land()
 
   

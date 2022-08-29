@@ -232,7 +232,12 @@ class MAV2(Node):
         [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
         if yaw == None:
             yaw = current_yaw
-        while(np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2) + (current_yaw - yaw)**2) > TOL:
+        
+        if yaw*current_yaw >= 0:
+            yaw_diff = yaw - current_yaw
+        else:
+            yaw_diff = yaw + current_yaw
+        while(np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2) + (yaw_diff)**2) > TOL:
             rclpy.spin_once(self)
             current_x = self.drone_pose.pose.position.x
             current_y = self.drone_pose.pose.position.y

@@ -210,6 +210,7 @@ class MAV2(Node):
         self.goal_pose.pose.position.y = float(y)
         self.goal_pose.pose.position.z = float(z)
         if yaw == None:
+            rclpy.spin_once(self)
             self.goal_pose.pose.orientation = self.drone_pose.pose.orientation
         else:
             [self.goal_pose.pose.orientation.x, 

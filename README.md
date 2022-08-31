@@ -4,7 +4,7 @@ Repository for basic mav functions implemented in ROS 2
 ## Dependencies
 - ROS2 running with Mavros (Recommended installation: [skyrats-workplace](https://github.com/SkyRats/skyrats-workplace/tree/ros2))
 - ```sudo apt install python3-opencv```
-- ```sudo apt install ros-$ROS_DISTRO-tf-transformations```
+- ```sudo apt install tf```
 - ```pip3 install transforms3d```
 - ```pip3 install pygeodesy```
 - ```pip3 install scipy```

@@ -1,20 +1,27 @@
 #!/usr/bin/env python3
 
 from ast import Pass
+from cmath import nan
 from tkinter import SEL
 from turtle import position
 import rospy
-from mavros_msgs.srv import SetMode, CommandBool, WaypointPull, WaypointSetCurrent, ParamSet
+from mavros_msgs.srv import SetMode, CommandBool, CommandTOL, ParamSet
 from mavros_msgs.msg import State, ExtendedState, PositionTarget, ParamValue
 
 from geometry_msgs.msg import PoseStamped, TwistStamped
 from sensor_msgs.msg import BatteryState, NavSatFix, Image
 import numpy as np
+<<<<<<< HEAD
 import math
 import sys
 from cv_bridge import CvBridge 
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
+=======
+>>>>>>> 14576a08cb8cf75657c640ee13db6354eb4b1a58
 
+from cv_bridge import CvBridge 
+from tf.transformations import quaternion_from_euler, euler_from_quaternion
+import math
 
 DEBUG = False
 
@@ -41,7 +48,10 @@ class MAV2():
         self.arm_srv = rospy.ServiceProxy('/mavros/cmd/arming', CommandBool)
         self.set_mode_srv = rospy.ServiceProxy('mavros/set_mode', SetMode)
         self.param_set_srv = rospy.ServiceProxy('/mavros/param/set', ParamSet)
-     
+        self.takeoff_srv = rospy.ServiceProxy('/mavros_msgs/CommandTOL', CommandTOL)
+   
+
+    
         ############### Publishers ##############
         self.local_position_pub = rospy.Publisher('/mavros/setpoint_position/local', PoseStamped, queue_size = 20)
         self.velocity_pub = rospy.Publisher('/mavros/setpoint_velocity/cmd_vel',  TwistStamped, queue_size=5)
@@ -89,10 +99,8 @@ class MAV2():
     def battery_callback (self, battery_data):
         self.battery = battery_data
     
-    def local_callback(self, local):
-        self.drone_pose.pose.position.x = local.pose.position.x
-        self.drone_pose.pose.position.y = local.pose.position.y
-        self.drone_pose.pose.position.z = local.pose.position.z
+    def local_callback(self, data):
+        self.drone_pose = data
 
     def cam_callback(self, cam_data):
         self.cam = self.bridge_object.imgmsg_to_cv2(cam_data,"bgr8")
@@ -110,13 +118,11 @@ class MAV2():
 
     ###Set mode: PX4 mode - string, timeout (seconds) - int
     def set_mode(self, mode):
-        #self.get_logger().info("setting FCU mode: {0}".format(mode))
+        rospy.loginfo("setting FCU mode: {0}".format(mode))
         service_timeout = 15
         rospy.wait_for_service('mavros/set_mode', service_timeout)
-  
-        result = self.set_mode_srv(0, mode)
-        if not result.mode_sent:
-            rospy.logerr("failed to send mode command")
+        while (self.drone_state.mode != mode ):        
+            self.set_mode_srv(0, mode)
             
     def set_param(self, param_name, param_value):
         service_timeout = 15
@@ -125,31 +131,45 @@ class MAV2():
         a.real = param_value        
         self.param_set_srv(param_name, a)
 
+    '''def takeoff(self, height):
+ 
+        self.arm()
+        
+        rospy.loginfo("Takeoff")
+
+        self.go_to_local(0,0,height)
+
+
+
+    '''
     def takeoff(self, height, speed=1.5, safety_on=True):
     
         name_alt= 'MIS_TAKEOFF_ALT'
-        self.set_param(name_alt, height)
+        self.set_param(name_alt, float(height))
         
         name_vel_z = 'MPC_Z_VEL_ALL'
-        self.set_param(name_vel_z, -3)
+        self.set_param(name_vel_z, -3.0)
 
         name_speed = 'MPC_TKO_SPEED'
         self.set_param(name_speed, speed)
         
 
-        if self.drone_extended_state.landed_state != 1:
-            rospy.logerr("Drone is not grounded! Takeoff cancelled")
-            return
+        #if self.drone_extended_state.landed_state != 1:
+        #    rospy.logerr("Drone is not grounded! Takeoff cancelled")
+        #    return
         self.arm()
+        
         self.set_mode("AUTO.TAKEOFF")
-        #safety measures: locks program while taking off
+        
         if safety_on:
-            while self.drone_extended_state.landed_state != 3:
-                self.rate.sleep()
-            while self.drone_extended_state.landed_state == 3:
-                self.rate.sleep()
-                
+            while self.drone_state.mode != "AUTO.TAKEOFF":
+                pass
+            while self.drone_state.mode == "AUTO.TAKEOFF":
+                pass
         rospy.loginfo("Takeoff completed!")
+
+
+
 
     def hold(self, hold_time): # hold time in seconds
         x_init = self.drone_pose.pose.position.x
@@ -172,6 +192,7 @@ class MAV2():
             self.goal_pose.pose.orientation.y, 
             self.goal_pose.pose.orientation.z,
             self.goal_pose.pose.orientation.w] = quaternion_from_euler(0,0,yaw) #roll,pitch,yaw
+            #print("X: " + str(self.goal_pose)))
 
         while self.drone_state.mode != "OFFBOARD":
             self.local_position_pub.publish(self.goal_pose)
@@ -179,43 +200,51 @@ class MAV2():
         self.local_position_pub.publish(self.goal_pose)
 
     
-    def go_to_local(self, goal_x, goal_y, goal_z, yaw = None, vel_xy = None, vel_z = None, TOL=0.2):
-        self.get_logger().info("Going towards local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + "), with a yaw angle of: " + str(yaw))
+    def go_to_local(self, goal_x, goal_y, goal_z, yaw = None, TOL=0.2):
+        rospy.loginfo("Going towards local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + "), with a yaw angle of: " + str(yaw))
         current_x = self.drone_pose.pose.position.x
         current_y = self.drone_pose.pose.position.y
         current_z = self.drone_pose.pose.position.z
         [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
         if yaw == None:
             yaw = current_yaw
-        self.change_auto_speed(vel_xy, vel_z)
-        while(np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2) + (current_yaw - yaw)**2) > TOL:
-            rclpy.spin_once(self)
+        
+        if yaw*current_yaw >= 0:
+            yaw_diff = yaw - current_yaw
+        else:
+            yaw_diff = yaw + current_yaw
+        while not rospy.is_shutdown() and (np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2) + (yaw_diff)**2) > TOL:
             current_x = self.drone_pose.pose.position.x
             current_y = self.drone_pose.pose.position.y
             current_z = self.drone_pose.pose.position.z
             [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
             self.set_position(goal_x, goal_y, goal_z, yaw)
-        self.get_logger().info("Arrived at requested position")
+            if yaw*current_yaw >= 0:
+                yaw_diff = yaw - current_yaw
+            else:
+                yaw_diff = yaw + current_yaw
+            if yaw_diff > 3:
+                print("deu merda familia")
+        rospy.loginfo("Arrived at requested position")
 
     
     def change_auto_speed(self, vel_xy = None, vel_z = None):
         if vel_xy != None:
-            vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=float(vel_xy), type=ParameterType.PARAMETER_DOUBLE))
-            self.set_param(vel_xy_param_value)
-            self.get_logger().info("Horizontal velocity parameter set to " +str(vel_xy))
+            name_vel_xy = 'MPC_XY_VEL_MAX'
+            self.set_param(name_vel_xy, vel_xy)
+            rospy.loginfo("Horizontal velocity parameter set to " +str(vel_xy))
         else:
-            vel_xy_param_value = Parameter(name= 'MPC_XY_VEL_MAX', value=ParameterValue(double_value=12.0, type=ParameterType.PARAMETER_DOUBLE))
-            self.set_param(vel_xy_param_value)
-            self.get_logger().info("Horizontal velocity parameter set to default")
+            name_xy_max = 'MPC_XY_VEL_MAX'
+            self.set_param(name_xy_max,12.0)
+            rospy.loginfo("Horizontal velocity parameter set to default")
         if vel_z != None:
-           vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=float(vel_z), type=ParameterType.PARAMETER_DOUBLE))
-           self.set_param(vel_z_param_value)
-           self.get_logger().info("Vertical velocity parameter set to " +str(vel_z))
+            name_vel_z = 'MPC_Z_VEL_ALL'
+            self.set_param(name_vel_z, vel_z)
+            rospy.loginfo("Vertical velocity parameter set to " +str(vel_z))
         else:
-           vel_z_param_value = Parameter(name= 'MPC_Z_VEL_ALL', value=ParameterValue(double_value=-3.0, type=ParameterType.PARAMETER_DOUBLE))
-           self.set_param(vel_z_param_value)
-           self.get_logger().info("Vertical velocity parameter set to default")
-        rclpy.spin_once(self)
+            name_z_max = 'MPC_Z_VEL_ALL'
+            self.set_param(name_z_max, -3.0)
+            rospy.loginfo("Vertical velocity parameter set to default")
 
     def set_vel(self, x, y, z, yaw = 0):
         while self.drone_state.mode != "OFFBOARD":
@@ -326,10 +355,28 @@ if __name__ == '__main__':
     mav = MAV2()
     #mav.set_mode("AUTO.LAND")
     #mav.set_param("MIS_TAKEOFF_ALT", 2)
+<<<<<<< HEAD
 
     mav.takeoff_teste(0.5)
     mav.hold(10)
     #mav.land()
+=======
+    #mav.change_auto_speed(vel_xy = 2, vel_z = 1.5)
+    mav.takeoff(2)
+    #mav.go_to_local(0,0,3, yaw = -1.5708)
+    #mav.go_to_local(5,0,3)
+    #mav.go_to_local(0,0,3, yaw = 0)
+    #mav.go_to_local(5,0,3)
+    mav.go_to_local(0,0,3, yaw = 1.5708)
+    mav.go_to_local(5,0,3)
+    mav.go_to_local(0,0,3, yaw = 3.14)
+    mav.go_to_local(5,0,3)
+    mav.go_to_local(0,0,3, yaw = -3.14)
+    mav.go_to_local(5,0,3)
+
+
+    mav.land()
+>>>>>>> 14576a08cb8cf75657c640ee13db6354eb4b1a58
 
   
 

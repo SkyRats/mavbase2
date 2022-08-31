@@ -13,7 +13,7 @@ import numpy as np
 import math
 import sys
 from cv_bridge import CvBridge 
-from tf_transformations import quaternion_from_euler, euler_from_quaternion
+from tf.transformations import quaternion_from_euler, euler_from_quaternion
 
 
 DEBUG = False
@@ -277,6 +277,49 @@ class MAV2():
             self.arm_srv(False)
         rospy.loginfo('Drone is disarmed')
 
+    def takeoff_teste(self, height):
+        velocity = 1 # velocidade media
+
+        for i in range(100):
+            self.set_position(self.drone_pose.pose.position.x, self.drone_pose.pose.position.y, 0)
+            self.rate.sleep()
+
+        self.set_mode("OFFBOARD", 2)
+
+        if not self.drone_state.armed:
+            rospy.logwarn("ARMING DRONE")
+            fb = self.arm(True)
+            while not fb.success:
+                if DEBUG:
+                    rospy.logwarn("ARMING DRONE {}".format(fb))
+                fb = self.arm(True)
+                self.rate.sleep()
+            rospy.loginfo("DRONE ARMED")
+        else:
+            rospy.loginfo("DRONE ALREADY ARMED")
+        self.rate.sleep()
+        rospy.logwarn("EXECUTING TAKEOFF METHODS")
+        p = self.drone_pose.pose.position.z
+        time=0
+        while abs(self.drone_pose.pose.position.z - height) >= TOL and not rospy.is_shutdown():
+            time += 1/60.0#sec - init_time
+            if DEBUG:
+                rospy.logwarn('TAKING OFF AT ' + str(velocity) + ' m/s')   
+            
+            if p < height:
+                p = ((-2 * (velocity**3) * (time**3)) / height**2) + ((3*(time**2) * (velocity**2))/height)
+                self.go_to_local(self.drone_pose.pose.position.x, self.drone_pose.pose.position.y, p)
+
+            else:
+                self.go_to_local(self.drone_pose.pose.position.x, self.drone_pose.pose.position.y, height)
+
+            #rospy.loginfo('Position: (' + str(self.drone_pose.pose.position.x) + ', ' + str(self.drone_pose.pose.position.y) + ', '+ str(self.drone_pose.pose.position.z) + ')')
+
+        self.rate.sleep()
+        self.go_to_local(self.drone_pose.pose.position.x, self.drone_pose.pose.position.y, height)
+        rospy.loginfo("TAKEOFF FINISHED")
+        
+        return "done"
 
 if __name__ == '__main__':
     rospy.init_node('mavbase2')
@@ -284,7 +327,7 @@ if __name__ == '__main__':
     #mav.set_mode("AUTO.LAND")
     #mav.set_param("MIS_TAKEOFF_ALT", 2)
 
-    mav.takeoff(3)
+    mav.takeoff_teste(0.5)
     mav.hold(10)
     #mav.land()
 

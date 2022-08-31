@@ -3,8 +3,8 @@
 import sys
 import os
 sys.path.insert(0,'/home/' + os.environ["USER"] + '/skyrats_ws2/src/mavbase2')
-from MAV2 import MAV2
-import rclpy
+from mavbase2.MAV2 import MAV2
+import rospy
 
 """
 SCRIPT DE TESTE PARA VOOS AUTÔNOMOS
@@ -17,7 +17,7 @@ Instruções de como rodar no README da mavbase2 (https://github.com/SkyRats/mav
 """
 
 def run():
-    rclpy.init()
+    rospy.init()
     mav = MAV2()
     mav.get_logger().info("Drone will take off to 3 m and move 2 m forward and then land")
     mav.takeoff(3)

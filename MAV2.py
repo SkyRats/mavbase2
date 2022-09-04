@@ -41,6 +41,7 @@ class MAV2(Node):
         self.goal_pose = PoseStamped()
         self.drone_pose = PoseStamped()
         self.pose_target = PositionTarget()
+        self.drone_vel = TwistStamped()
         self.goal_vel = TwistStamped()
         self.drone_state = State()
         self.drone_extended_state = ExtendedState()
@@ -80,6 +81,7 @@ class MAV2(Node):
         ########## Subscribers ##################
 
         self.local_atual = self.create_subscription(PoseStamped, '/mavros/local_position/pose', self.local_callback, qos.qos_profile_sensor_data)
+        self.vel_atual = self.create_subscription(TwistStamped, '/mavros/local_position/velocity_local', self.vel_callback, qos.qos_profile_sensor_data)
         self.state_sub =  self.create_subscription(State, '/mavros/state', self.state_callback, qos.qos_profile_sensor_data)
         self.extended_state_sub =  self.create_subscription(ExtendedState, '/mavros/extended_state', self.extended_state_callback, qos.qos_profile_sensor_data)
         self.battery_sub =  self.create_subscription(BatteryState, '/mavros/battery', self.battery_callback, qos.qos_profile_sensor_data)
@@ -127,6 +129,9 @@ class MAV2(Node):
     
     def local_callback(self, data):
         self.drone_pose = data
+
+    def vel_callback(self, data):
+        self.drone_vel = data
     
     def global_callback(self, global_data):
         self.global_pose = global_data

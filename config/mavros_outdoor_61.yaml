@@ -13,5 +13,5 @@ mavros_node:
 
 /**:
   ros__parameters:
-    plugin_denylist: [odometry]
+    plugin_denylist: [odometry, distance_sensor]
     # plugin_allowlist: []

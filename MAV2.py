@@ -24,8 +24,9 @@ import cv2
 from cv_bridge import CvBridge 
 from tf_transformations import quaternion_from_euler, euler_from_quaternion
 from pygeodesy.geoids import GeoidPGM
-
 from mavbase2.action import SetPosition 
+import csv
+import time
 
 DEBUG = False
 
@@ -53,6 +54,8 @@ class MAV2(Node):
         self.bridge_object = CvBridge()
         self.camera_topic = "/camera/image_raw"
         self._egm96 = GeoidPGM('/usr/share/GeographicLib/geoids/egm96-5.pgm', kind=-3)
+        self.received_waypoints = []
+        self.init_time = time.time()
 
         ############# Services ##################
 
@@ -429,6 +432,20 @@ class MAV2(Node):
         c=2*math.atan2(math.sqrt(a),math.sqrt(1-a))
         
         return R*c                             # output distance in meters
+
+    def write_csv_log(self):
+        now = time.time() - self.init_time
+        
+        log = {'Time in seconds' : now,
+        'Latitude' : self.global_pose.latitude,
+        'Longitude' : self.global_pose.longitude,
+        'Altitude' : self.global_altitude
+        }
+        file = open('MissionLog.csv', 'a', newline ='')
+        with file:   
+            header = ['Time in seconds', 'Latitude', 'Longitude', 'Altitude']
+            writer = csv.DictWriter(file, fieldnames = header)
+            writer.writerow(log)
     
     ############# Centralization Functions #############
     def camera_pid(self, delta_x, delta_y, delta_area):

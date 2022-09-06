@@ -42,6 +42,7 @@ class MAV2(Node):
         self.goal_pose = PoseStamped()
         self.drone_pose = PoseStamped()
         self.pose_target = PositionTarget()
+        self.drone_vel = TwistStamped()
         self.goal_vel = TwistStamped()
         self.drone_state = State()
         self.drone_extended_state = ExtendedState()
@@ -81,6 +82,7 @@ class MAV2(Node):
         ########## Subscribers ##################
 
         self.local_atual = self.create_subscription(PoseStamped, '/mavros/local_position/pose', self.local_callback, qos.qos_profile_sensor_data)
+        self.vel_atual = self.create_subscription(TwistStamped, '/mavros/local_position/velocity_local', self.vel_callback, qos.qos_profile_sensor_data)
         self.state_sub =  self.create_subscription(State, '/mavros/state', self.state_callback, qos.qos_profile_sensor_data)
         self.extended_state_sub =  self.create_subscription(ExtendedState, '/mavros/extended_state', self.extended_state_callback, qos.qos_profile_sensor_data)
         self.battery_sub =  self.create_subscription(BatteryState, '/mavros/battery', self.battery_callback, qos.qos_profile_sensor_data)
@@ -128,6 +130,9 @@ class MAV2(Node):
     
     def local_callback(self, data):
         self.drone_pose = data
+
+    def vel_callback(self, data):
+        self.drone_vel = data
     
     def global_callback(self, global_data):
         self.global_pose = global_data
@@ -211,6 +216,7 @@ class MAV2(Node):
         self.goal_pose.pose.position.y = float(y)
         self.goal_pose.pose.position.z = float(z)
         if yaw == None:
+            rclpy.spin_once(self)
             self.goal_pose.pose.orientation = self.drone_pose.pose.orientation
         else:
             [self.goal_pose.pose.orientation.x, 
@@ -232,7 +238,12 @@ class MAV2(Node):
         [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
         if yaw == None:
             yaw = current_yaw
-        while(np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2) + (current_yaw - yaw)**2) > TOL:
+        
+        if yaw*current_yaw >= 0:
+            yaw_diff = yaw - current_yaw
+        else:
+            yaw_diff = yaw + current_yaw
+        while(np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2) + (yaw_diff)**2) > TOL:
             rclpy.spin_once(self)
             current_x = self.drone_pose.pose.position.x
             current_y = self.drone_pose.pose.position.y

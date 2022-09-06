@@ -20,6 +20,7 @@ from action_py.setPosition_action_server import SetPositionActionServer
 import numpy as np
 import math
 import sys
+import cv2
 from cv_bridge import CvBridge 
 from tf_transformations import quaternion_from_euler, euler_from_quaternion
 from pygeodesy.geoids import GeoidPGM

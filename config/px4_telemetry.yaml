@@ -8,7 +8,7 @@ mavros_node:
   ros__parameters:
     fcu_url: /dev/ttyUSB0:57600
     gcs_url: tcp-l://:5670
-    tgt_system: 61
+    tgt_system: 1
     tgt_component: 1
 /**:
   ros__parameters:

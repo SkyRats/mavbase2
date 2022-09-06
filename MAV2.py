@@ -246,7 +246,7 @@ class MAV2(Node):
             yaw_diff = yaw - current_yaw
         else:
             yaw_diff = yaw + current_yaw
-        while(np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2) + (yaw_diff)**2) > TOL:
+        while(np.sqrt((goal_x - current_x  )**2 + (goal_y - current_y)**2 + (goal_z - current_z)**2) + (yaw - current_yaw)**2) > TOL:
             rclpy.spin_once(self)
             current_x = self.drone_pose.pose.position.x
             current_y = self.drone_pose.pose.position.y

@@ -261,7 +261,7 @@ class MAV2(Node):
             self.set_mode("OFFBOARD")
         self.pose_target_pub.publish(self.pose_target)
 
-    def go_to_local(self, goal_x, goal_y, goal_z, yaw = None, coordinate_frame=PositionTarget.FRAME_LOCAL_NED, type_mask=0b0000101111111000, TOL=0.2):
+    def go_to_local(self, goal_x, goal_y, goal_z, yaw = None, TOL=0.2):
         self.get_logger().info("Going towards local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + "), with a yaw angle of: " + str(yaw))
         current_x = self.drone_pose.pose.position.x
         current_y = self.drone_pose.pose.position.y
@@ -280,7 +280,7 @@ class MAV2(Node):
             current_y = self.drone_pose.pose.position.y
             current_z = self.drone_pose.pose.position.z
             [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
-            self.set_position(goal_x, goal_y, goal_z, yaw, coordinate_frame, type_mask)
+            self.set_position(goal_x, goal_y, goal_z, yaw)
         self.get_logger().info("Arrived at requested position")
 
     def go_to_global(self, lat, lon, alt,yaw=0,  GLOBAL_TOL = 0.2):
@@ -369,11 +369,11 @@ class MAV2(Node):
         self.get_logger().info("Setting altitude to " + str(goal_alt) + " m")
         while abs(goal_alt - self.altitude) > ALT_TOL:
             
+            rclpy.spin_once(self)
             self.goal_pose.pose.position.x = self.drone_pose.pose.position.x
             self.goal_pose.pose.position.y = self.drone_pose.pose.position.y
             self.goal_pose.pose.position.z = float(goal_alt)
             self.local_position_pub.publish(self.goal_pose)
-            rclpy.spin_once(self)
             self.get_logger().info(str(abs(goal_alt - self.altitude)))
             while self.drone_state.mode != "OFFBOARD":
                 self.local_position_pub.publish(self.goal_pose)

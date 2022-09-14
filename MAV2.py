@@ -5,7 +5,7 @@ from turtle import position
 import rclpy
 from mavros_msgs import srv
 from mavros_msgs.srv import SetMode, CommandBool, WaypointPull, WaypointSetCurrent
-from mavros_msgs.msg import State, ExtendedState, PositionTarget, WaypointList
+from mavros_msgs.msg import State, ExtendedState, PositionTarget, WaypointList, Altitude
 from rcl_interfaces.msg import ParameterType, Parameter, ParameterValue
 from rcl_interfaces.srv import SetParameters
 from geometry_msgs.msg import PoseStamped, TwistStamped
@@ -40,9 +40,9 @@ class MAV2(Node):
         self.rate = self.create_rate(60)
         self.desired_state = ""
         self.drone_state = State()
+        self.pose_target = PositionTarget()
         self.goal_pose = PoseStamped()
         self.drone_pose = PoseStamped()
-        self.pose_target = PositionTarget()
         self.drone_vel = TwistStamped()
         self.goal_vel = TwistStamped()
         self.drone_state = State()
@@ -56,6 +56,7 @@ class MAV2(Node):
         self._egm96 = GeoidPGM('/usr/share/GeographicLib/geoids/egm96-5.pgm', kind=-3)
         self.received_waypoints = []
         self.init_time = time.time()
+        self.altitude = Altitude()
 
         ############# Services ##################
 
@@ -78,6 +79,7 @@ class MAV2(Node):
         ############### Publishers ##############
 
         self.local_position_pub = self.create_publisher(PoseStamped, '/mavros/setpoint_position/local', 20)
+        self.pose_target_pub = self.create_publisher(PositionTarget, '/mavros/setpoint_raw/local', 20)
         self.velocity_pub = self.create_publisher(TwistStamped,  '/mavros/setpoint_velocity/cmd_vel', 5)
         self.target_pub = self.create_publisher(PositionTarget, '/mavros/setpoint_raw/local', 5)
         self.global_position_pub = self.create_publisher(GeoPoseStamped, '/mavros/setpoint_position/global', 20)
@@ -92,6 +94,7 @@ class MAV2(Node):
         self.global_position_sub =  self.create_subscription(NavSatFix,'/mavros/global_position/global' , self.global_callback, qos.qos_profile_sensor_data)
         self.cam_sub = self.create_subscription(Image, self.camera_topic, self.cam_callback, qos.qos_profile_sensor_data)
         self.waypoints_sub =self.create_subscription(WaypointList, '/mavros/mission/waypoints', self.waypoints_callback, qos.qos_profile_sensor_data)
+        self.altitude_sub = self.create_subscription(Altitude, '/mavros/altitude', self.altitude_callback, qos.qos_profile_sensor_data)
 
         service_timeout = 15
         while not self.set_mode_srv.wait_for_service(timeout_sec=service_timeout):
@@ -146,6 +149,9 @@ class MAV2(Node):
     
     def waypoints_callback(self, waypoints_data):
         self.received_waypoints = waypoints_data
+
+    def altitude_callback(self, alt_data):
+        self.altitude = alt_data.local
     
     ########## Battery verification ##########
     def verify_battery(self):
@@ -232,8 +238,30 @@ class MAV2(Node):
             self.set_mode("OFFBOARD")
         self.local_position_pub.publish(self.goal_pose)
 
-    
-    def go_to_local(self, goal_x, goal_y, goal_z, yaw = None, TOL=0.2):
+
+    def set_position_target(self, x, y, z, yaw = None, coordinate_frame=PositionTarget.FRAME_LOCAL_NED, type_mask=0b0000101111111000):
+        # https://mavlink.io/en/messages/common.html#POSITION_TARGET_TYPEMASK
+
+        self.pose_target.type_mask = type_mask
+        self.pose_target.coordinate_frame = coordinate_frame
+
+        self.pose_target.position.x = float(x)
+        self.pose_target.position.y = float(y)
+        self.pose_target.position.z = float(z)
+
+        if yaw == None:
+            rclpy.spin_once(self)
+            [current_roll, current_pitch, current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
+            self.pose_target.yaw = float(current_yaw)
+        else:
+            self.pose_target.yaw = float(yaw)
+
+        while self.drone_state.mode != "OFFBOARD":
+            self.local_position_pub.publish(self.pose_target)
+            self.set_mode("OFFBOARD")
+        self.pose_target_pub.publish(self.pose_target)
+
+    def go_to_local(self, goal_x, goal_y, goal_z, yaw = None, coordinate_frame=PositionTarget.FRAME_LOCAL_NED, type_mask=0b0000101111111000, TOL=0.2):
         self.get_logger().info("Going towards local position: (" + str(goal_x) + ", " + str(goal_y) + ", " + str(goal_z) + "), with a yaw angle of: " + str(yaw))
         current_x = self.drone_pose.pose.position.x
         current_y = self.drone_pose.pose.position.y
@@ -252,7 +280,7 @@ class MAV2(Node):
             current_y = self.drone_pose.pose.position.y
             current_z = self.drone_pose.pose.position.z
             [_,_,current_yaw] = euler_from_quaternion([self.drone_pose.pose.orientation.x,self.drone_pose.pose.orientation.y,self.drone_pose.pose.orientation.z,self.drone_pose.pose.orientation.w])
-            self.set_position(goal_x, goal_y, goal_z, yaw)
+            self.set_position(goal_x, goal_y, goal_z, yaw, coordinate_frame, type_mask)
         self.get_logger().info("Arrived at requested position")
 
     def go_to_global(self, lat, lon, alt,yaw=0,  GLOBAL_TOL = 0.2):
@@ -336,6 +364,20 @@ class MAV2(Node):
 
         if auto_disarm:
             self.disarm()
+        
+    def change_altitude(self, goal_alt, ALT_TOL=0.2):
+        self.get_logger().info("Setting altitude to " + str(goal_alt) + " m")
+        while abs(goal_alt - self.altitude) > ALT_TOL:
+            
+            self.goal_pose.pose.position.x = self.drone_pose.pose.position.x
+            self.goal_pose.pose.position.y = self.drone_pose.pose.position.y
+            self.goal_pose.pose.position.z = float(goal_alt)
+            self.local_position_pub.publish(self.goal_pose)
+            rclpy.spin_once(self)
+            self.get_logger().info(str(abs(goal_alt - self.altitude)))
+            while self.drone_state.mode != "OFFBOARD":
+                self.local_position_pub.publish(self.goal_pose)
+                self.set_mode("OFFBOARD")
         
     ########## Arm #######
 
@@ -474,13 +516,22 @@ class MAV2(Node):
 if __name__ == '__main__':
     rclpy.init(args=sys.argv)
     mav = MAV2()
-    #mav.go_to_global(mav.global_pose.latitude + 0.000008, mav.global_pose.longitude + 0.000008, mav.global_altitude)
-    #mav.get_logger().info("GPS coordinates: " + str(mav.global_pose.latitude) + " lat " + str(mav.global_pose.longitude) + " lon")
-    #mav.go_to_local(0, 0, 5, vel_xy=1)
-    #mav.go_to_global(47.3977422, 8.5456861, mav.global_altitude, vel_xy=10)
-    #mav.change_auto_speed(0.1)
-    #mav.land()
-    #mav.verify_battery()
-   
+    mav.set_mode("OFFBOARD")
+    mav.mission_set_current_waypoint(0)
+    mav.mission_start()
+    while mav.mission_get_current_waypoint() < len(mav.mission_get_waypoints_list()) - 1:
+        mav.get_logger().info(str(mav.mission_get_current_waypoint()))
+        mav.get_logger().info(str(len(mav.mission_get_waypoints_list())-1))
+        pass
+    mav.mission_pause()
+    mav.change_altitude(9)
+    time.sleep(1)
+    mav.change_altitude(6)
+    mav.hold(1)
+    mav.change_altitude(10)
+    mav.mission_set_current_waypoint(0)
+    mav.mission_start()
+    
+
 
     

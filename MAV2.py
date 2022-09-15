@@ -422,6 +422,7 @@ class MAV2(Node):
     def mission_get_waypoints_list(self):
         while not self.waypoint_pull_srv.wait_for_service(timeout_sec=5):
             self.get_logger().info('Waypoint pull service not available, waiting again...')
+        rclpy.spin_once(self)
         future = self.waypoint_pull_srv.call_async(self.waypoint_pull_req)
         while future.result() == None:
             rclpy.spin_once(self)
@@ -430,6 +431,7 @@ class MAV2(Node):
     def mission_get_current_waypoint(self):
         while not self.waypoint_pull_srv.wait_for_service(timeout_sec=5):
             self.get_logger().info('Waypoint pull service not available, waiting again...')
+        rclpy.spin_once(self)
         future = self.waypoint_pull_srv.call_async(self.waypoint_pull_req)
         while future.result() == None:
             rclpy.spin_once(self)
@@ -439,6 +441,7 @@ class MAV2(Node):
         self.waypoint_set_req.wp_seq = wp_number
         while not self.waypoint_set_srv.wait_for_service(timeout_sec=5):
             self.get_logger().info('Waypoint set service not available, waiting again...')
+        rclpy.spin_once(self)
         future = self.waypoint_set_srv.call_async(self.waypoint_set_req)
         while future.result() == None:
             rclpy.spin_once(self)
